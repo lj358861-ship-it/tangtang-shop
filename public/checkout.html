@@ -7,7 +7,7 @@ TT.ready.then(async()=>{
   let q; try{q=await api('/api/quote',{body:{lines:cart.map(c=>({id:c.id,qty:c.qty})),country:TT.country(),mode:TT.mode()}})}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(TT.errMsg(e))+'</div>';return}
   if(!q.ok){location.href='/cart';return}
   const u=TT.user;
-  $('#app').innerHTML=`<div class="pd" style="grid-template-columns:1.2fr 1fr;align-items:start"><form class="box" id="f"><h3>📍 ${esc(t('deliv_t'))}</h3>
+  $('#app').innerHTML=`<div class="pd pd2"><form class="box" id="f"><h3>📍 ${esc(t('deliv_t'))}</h3>
     <div class="alert ok sm">${TT.flag(q.country)} <b>${esc(TT.countryName(q.country))}</b> · ${q.mode==='air'?'✈️ '+esc(t('air')):'🚢 '+esc(t('sea'))} · ${q.days} ${esc(t('days'))} — <a href="/cart" style="text-decoration:underline">${esc(t('change_country'))}</a></div>
     <label>${esc(t('f_name'))}</label><input id="name" required value="${esc(u.name||'')}" maxlength="80">
     <label>${esc(t('f_phone'))}</label><input id="phone" type="tel" required value="${esc(u.phone||'')}" maxlength="30">

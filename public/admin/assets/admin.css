@@ -15,3 +15,5 @@ body{display:flex;min-height:100vh}
 .cl{overflow:auto;background:var(--card);border:1px solid var(--bd);border-radius:var(--r)}.cl .it{padding:12px 14px;border-bottom:1px solid var(--bd);cursor:pointer}.cl .it:hover,.cl .it.on{background:var(--pk2)}.cl .it .row b{font-size:14px}
 .pimg{width:46px;height:46px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid var(--bd)}
 .login{max-width:400px;margin:12vh auto;width:100%;padding:0 16px}
+
+@media(max-width:820px){.cont{padding:14px 12px}.side{padding:8px;gap:4px}.side a{padding:8px 10px;font-size:13px}.side .brand{padding:4px 8px 8px}.kpis{grid-template-columns:repeat(2,1fr)}.modal{padding:10px 8px}.modal .in{padding:14px}.fb input,.fb select{min-width:0;flex:1}.g2,.g3{grid-template-columns:1fr}.tw{overflow-x:auto}}

@@ -9,7 +9,7 @@ TT.ready.then(async()=>{
     const ids=[...new Set(cart.map(c=>c.id))]; const need=ids.filter(i=>!prods[i]);
     if(need.length)(await api('/api/products/batch?ids='+need.join(','))).forEach(p=>prods[p.id]=p);
     const lines=cart.filter(c=>prods[c.id]);
-    $('#app').innerHTML=`<div class="pd" style="grid-template-columns:1.25fr 1fr;align-items:start"><div id="lines"></div><div>
+    $('#app').innerHTML=`<div class="pd pd2"><div id="lines"></div><div>
       <div class="box"><div id="cp"></div><div id="ms" style="margin-top:10px"></div></div><div id="q"></div><div class="box" id="bd"></div><div id="tiers"></div></div></div>`;
     $('#lines').innerHTML=lines.map(c=>{const p=prods[c.id],i=cart.indexOf(c);return `<div class="box li"><img src="${c.image||p.images[0]}" alt="">
       <div><a href="/product?id=${p.id}"><b>${esc(TT.pname(p))}</b></a><div class="mu sm">${esc(c.variant||'')}${c.variant&&c.size?' · ':''}${esc(c.size==='ONE'?t('one_size'):c.size||'')}</div>

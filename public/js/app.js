@@ -121,7 +121,7 @@
     const h = document.createElement('header'); h.className = 'hdr';
     h.innerHTML = `<div class="wrap"><a class="logo" href="/">🍬 Tangtang<small>糖糖</small></a>
       <nav class="nav" id="nav">${NAV.map(([u, k]) => `<a href="${u}" class="${path === u ? 'on' : ''}" data-i18n="${k}"></a>`).join('')}</nav>
-      <div class="tools"><select id="lgsel" aria-label="Language">${Object.entries(LANGS).map(([k, v]) => `<option value="${k}" ${k === lang ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <div class="tools"><select id="lgsel" aria-label="Language">${Object.entries(LANGS).map(([k, v]) => `<option value="${k}" title="${v}" ${k === lang ? 'selected' : ''}>${k === 'zh' ? '中文' : k.toUpperCase()}</option>`).join('')}</select>
       <select id="cusel" aria-label="Currency">${[['XAF', 'FCFA'], ['EUR', 'EUR'], ['USD', 'USD'], ['CNY', 'CNY']].map(([k, v]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <a class="ib" href="/cart" title="Cart">🛒<span class="n hide" id="cartn"></span></a>
       <a class="ib" href="/account" id="acc" title="Account">👤</a>

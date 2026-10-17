@@ -6,7 +6,7 @@ TT.ready.then(async()=>{
   const code=new URLSearchParams(location.search).get('code'); let o;
   try{o=await api('/api/orders/'+encodeURIComponent(code))}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return}
   const pb={paid:['ok','pay_paid'],pending_review:['warn','pay_pending'],failed:['bad','pay_failed'],unpaid:['','pay_unpaid']}[o.payment_status]||['',o.payment_status];
-  $('#app').innerHTML=`<div class="pd" style="grid-template-columns:1.2fr 1fr;align-items:start"><div>
+  $('#app').innerHTML=`<div class="pd pd2"><div>
     <div class="box"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0">#${o.code}</h2><span class="badge ${pb[0]}">${esc(t(pb[1]))}</span></div>
     <div class="mu sm">${TT.date(o.created_at)} · ${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.mode==='air'?'✈️ '+esc(t('air')):'🚢 '+esc(t('sea'))}</div>
     <div class="tl" style="margin-top:14px">${[0,1,2,3,4,5].map(i=>`<div class="${i<=o.status?'d':''}">${esc(t('st_'+i))}</div>`).join('')}</div></div>
