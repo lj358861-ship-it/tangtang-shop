@@ -1,0 +1,15 @@
+{
+  "name": "tangtang-shop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tangtang 糖糖 – multi-page wholesale shop with shipping quota, manual payment processing, chat and admin portal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "images": "python3 tools/clean_images.py"
+  },
+  "engines": { "node": ">=22.13" },
+  "dependencies": { "express": "^5.1.0" },
+  "optionalDependencies": { "sharp": "^0.35.5" }
+}
