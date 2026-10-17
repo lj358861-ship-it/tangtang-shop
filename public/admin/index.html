@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/css/site.css"><link rel="stylesheet" href="/admin/assets/admin.css"><script src="/admin/assets/admin.js"></script></head><body>
+<div id="page"><h1 id="t"></h1><div class="kpis" id="k"></div>
+<div class="g2" style="align-items:start"><div class="box"><b id="c1"></b><div class="bars" id="bars"></div><div style="height:18px"></div></div><div class="box"><b id="c2"></b><div class="tw"><table id="rec"></table></div></div></div></div>
+<script>
+(async()=>{const me=await A.shell('Dashboard');if(!me)return;const {T,esc,$}=A;
+$('#t').textContent=T('Dashboard','Tableau de bord');$('#c1').textContent=T('Orders – last 7 days','Commandes – 7 derniers jours');$('#c2').textContent=T('Latest orders','Dernières commandes');
+async function load(){const s=await A.api('/api/admin/stats');
+$('#k').innerHTML=[[s.pendingPayments,T('Payments to process','Paiements à traiter'),s.pendingPayments?'hot':'', '/admin/payments.html'],[s.unread,T('Unread messages','Messages non lus'),s.unread?'hot':'','/admin/messages.html'],[s.ordersToday,T('Orders today','Commandes aujourd’hui'),'','/admin/orders.html'],[s.orders,T('Total orders','Total commandes'),'','/admin/orders.html'],[A.fcfa(s.revenue),T('Revenue (paid)','Chiffre d’affaires (payé)'),''],[s.unpaid,T('Unpaid orders','Commandes impayées'),'','/admin/orders.html?pay=unpaid'],[s.customers,T('Customers','Clients'),'','/admin/users.html'],[s.products,T('Active products','Produits actifs'),'','/admin/products.html']].map(([v,l,c,h])=>`<a class="kpi ${c}" ${h?`href="${h}"`:''}><b>${v}</b><span>${l}</span></a>`).join('');
+const mx=Math.max(1,...s.last7.map(x=>x.n));$('#bars').innerHTML=s.last7.length?s.last7.map(x=>`<div style="height:${Math.max(4,x.n/mx*100)}%"><em>${x.n}</em><small>${x.d.slice(5)}</small></div>`).join(''):`<span class="mu">${T('No orders yet','Pas encore de commandes')}</span>`;
+$('#rec').innerHTML=s.recent.map(o=>`<tr><td><a href="/admin/orders.html?q=${o.code}"><b>#${o.code}</b></a><br><span class="mu sm">${esc(o.name)} · ${A.flag(o.country)}</span></td><td class="r">${A.fcfa(o.total)}<br><span class="badge ${A.PAY[o.payment_status][1]}">${A.PAY[o.payment_status][0]}</span></td></tr>`).join('')||`<tr><td class="mu">—</td></tr>`}
+load();A.onEvent=load;})();
+</script></body></html>

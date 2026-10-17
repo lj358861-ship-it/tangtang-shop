@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<main><div class="wrap">
+<section class="hero"><div><h1 data-i18n="hero_h"></h1><p data-i18n="hero_p"></p>
+<div class="gap" style="margin-top:16px"><a class="btn" href="/shop" data-i18n="hero_cta"></a><a class="btn line" href="/shipping" data-i18n="hero_cta2"></a></div>
+<div class="stats"><div><b id="s1">190+</b><span data-i18n="st_products"></span></div><div><b id="s2">45+</b><span data-i18n="st_countries"></span></div><div><b>50 000</b><span data-i18n="st_min"></span></div></div></div>
+<div class="mosaic" id="mos"></div></section>
+
+<div class="box" style="margin-top:18px"><div class="row top" style="flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3>📦 <span data-i18n="quota_title"></span></h3><div class="mu" data-i18n-html="quota_explain"></div></div>
+<div style="flex:1;min-width:240px" id="qdemo"></div></div></div>
+
+<div class="cats" id="cats"></div>
+
+<div class="sec" id="fl"><div class="row"><h2 data-i18n="flash"></h2><a class="btn alt sm" href="/shop?tab=promo" data-i18n="see_all"></a></div><div class="grid" id="g1"></div></div>
+<div class="sec" id="nw"><div class="row"><h2 data-i18n="new_arrivals"></h2><a class="btn alt sm" href="/shop?tab=new" data-i18n="see_all"></a></div><div class="grid" id="g3"></div></div>
+<div class="sec"><div class="row"><h2 data-i18n="hot"></h2><a class="btn alt sm" href="/shop?tab=hot" data-i18n="see_all"></a></div><div class="grid" id="g2"></div></div>
+
+<div class="sec"><h2 data-i18n="how_t"></h2><div class="steps4">
+<div class="box"><div class="num">1</div><b data-i18n="how1_t"></b><div class="mu sm" data-i18n="how1"></div></div>
+<div class="box"><div class="num">2</div><b data-i18n="how2_t"></b><div class="mu sm" data-i18n="how2"></div></div>
+<div class="box"><div class="num">3</div><b data-i18n="how3_t"></b><div class="mu sm" data-i18n="how3"></div></div>
+<div class="box"><div class="num">4</div><b data-i18n="how4_t"></b><div class="mu sm" data-i18n="how4"></div></div></div></div>
+
+<div class="sec"><h2 data-i18n="ship_teaser"></h2><div class="box"><div id="cp"></div><div id="ms" style="margin:10px 0"></div><div id="est" class="mu"></div></div></div>
+</div></main>
+<script>
+TT.ready.then(async()=>{
+  const {t,esc,api}=TT;
+  const q=(p)=>api('/api/products?limit=12&'+p);
+  const [promo,hot,nw,all]=await Promise.all([q('tab=promo&sort=price_desc'),q('tab=hot'),q('tab=new'),api('/api/products?limit=1')]);
+  document.getElementById('s1').textContent=all.total+'+'; document.getElementById('s2').textContent=TT.cfg.countries.length+'+';
+  document.getElementById('g1').innerHTML=promo.items.map(TT.card).join('');
+  document.getElementById('g2').innerHTML=hot.items.map(TT.card).join('');
+  document.getElementById('g3').innerHTML=nw.items.map(TT.card).join('');
+  const feat=[...promo.items.slice(0,3),...hot.items.slice(0,3),...nw.items.slice(0,3)];
+  document.getElementById('mos').innerHTML=feat.map(p=>'<img loading="lazy" alt="" src="'+p.images[0]+'">').join('');
+  document.getElementById('cats').innerHTML=TT.cfg.categories.map(c=>'<a class="cat" href="/shop?cat='+c.key+'"><span>'+(TT.EMOJI[c.key]||'✨')+'</span>'+esc(TT.catName(c.key))+'</a>').join('');
+  const min=TT.cfg.settings.min_order;
+  document.getElementById('qdemo').innerHTML=TT.quotaHTML({quota:60,ok:false,missing:min*.4,minOrder:min});
+  const est=async()=>{try{const e=await api('/api/quote',{body:{lines:[{id:hot.items[0].id,qty:Math.max(hot.items[0].moq,10)}],country:TT.country(),mode:TT.mode()}});
+    document.getElementById('est').innerHTML=esc(t('est_line',{n:Math.max(hot.items[0].moq,10),name:TT.pname(hot.items[0]),ship:TT.money(e.shipping),days:e.days+' '+t('days')}));}catch(e){}};
+  const ms=TT.modeSwitch(document.getElementById('ms'),est); TT.countryPicker(document.getElementById('cp'),()=>{ms.redraw();est();}); est();
+});
+</script></body></html>

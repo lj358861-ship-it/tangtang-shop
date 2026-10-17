@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/css/site.css"><link rel="stylesheet" href="/admin/assets/admin.css"><script src="/admin/assets/admin.js"></script></head><body>
+<div id="page"><h1 id="t"></h1><div class="mg"><div class="cl" id="cl"></div><div class="box chat" id="th" style="margin:0;padding:0;overflow:hidden;display:flex;flex-direction:column;height:100%"><div class="c mu" style="margin:auto" id="ph"></div></div></div></div>
+<script>
+(async()=>{const me=await A.shell('Messages');if(!me)return;const {T,esc,$}=A;$('#t').textContent=T('Messages','Messages');$('#ph').textContent=T('Select a conversation','Choisissez une conversation');
+let convs=[],cur=null,last=0;const u=new URLSearchParams(location.search);
+async function list(){convs=await A.api('/api/admin/conversations');
+$('#cl').innerHTML=convs.map(c=>`<div class="it ${cur===c.id?'on':''}" data-u="${c.id}"><div class="row"><b>${esc(c.name||c.email)}</b>${c.unread?`<span class="badge">${c.unread}</span>`:''}</div><div class="mu sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.last_body||'')}</div><div class="mu sm">${A.date(c.last_at)}</div></div>`).join('')||`<div class="it mu">${T('No conversations yet','Aucune conversation')}</div>`;
+$$('[data-u]').forEach(e=>e.onclick=()=>open(+e.dataset.u))}
+function bub(m){return `<div class="bub ${m.sender==='admin'?'me':''}" data-id="${m.id}">${m.order?`<div class="o">#${esc(m.order)}</div>`:''}${esc(m.body)}<small>${A.date(m.at)}</small></div>`}
+async function open(id){cur=id;const d=await A.api('/api/admin/conversations/'+id);last=d.messages.length?d.messages[d.messages.length-1].id:0;
+$('#th').innerHTML=`<div class="hd" style="background:var(--pk);color:#fff;padding:12px 14px"><b>${esc(d.user.name||d.user.email)}</b><small style="display:block;font-weight:400">${esc(d.user.email)} · ${esc(d.user.phone||'')}</small><div class="gap" style="margin-top:6px">${d.orders.map(o=>`<a class="badge" href="/admin/orders.html?q=${o.code}">#${o.code}</a>`).join('')}</div></div>
+<div class="ms" id="ms" style="flex:1;overflow:auto;padding:12px;background:var(--bg)">${d.messages.map(bub).join('')}</div>
+<div class="in" style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--bd)"><input id="ri" placeholder="${T('Reply…','Répondre…')}" autocomplete="off"><button class="btn" id="rs">➤</button></div>`;
+const ms=$('#ms');ms.scrollTop=ms.scrollHeight;
+const send=async()=>{const v=$('#ri').value.trim();if(!v)return;$('#ri').value='';const m=await A.api('/api/admin/conversations/'+id,{body:{body:v}});add(m)};
+$('#rs').onclick=send;$('#ri').onkeydown=e=>{if(e.key==='Enter')send()};$('#ri').focus();list()}
+function add(m){if(m.id<=last||m.userId!==cur)return;last=m.id;const ms=$('#ms');if(ms){ms.insertAdjacentHTML('beforeend',bub(m));ms.scrollTop=ms.scrollHeight}}
+A.onEvent=async(d)=>{if(d.type==='msg'){if(d.msg.userId===cur){add(d.msg);if(d.msg.sender==='user')A.api('/api/admin/conversations/'+cur)}list()}};
+await list();
+if(u.get('uid'))open(+u.get('uid'));else if(u.get('q')){const c=convs.find(c=>c.email===u.get('q'));if(c)open(c.id)}else if(convs[0]&&innerWidth>820)open(convs[0].id);})();
+</script></body></html>

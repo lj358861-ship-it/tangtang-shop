@@ -1,0 +1,70 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<main><div class="wrap" style="max-width:900px"><h1 style="font-size:30px" data-i18n="pay_title"></h1><div id="app"><div class="skel" style="height:300px"></div></div></div></main>
+<script>
+TT.ready.then(async()=>{
+  const {t,esc,api,$}=TT; if(!TT.requireLogin())return;
+  const code=new URLSearchParams(location.search).get('order'); let o;
+  try{o=await api('/api/orders/'+encodeURIComponent(code))}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return}
+  let method=null;
+  const M=[['card','💳',t('m_card'),'#7a3d57'],['mtn','📲',t('m_mtn'),'#ffcc00'],['orange','🟠',t('m_orange'),'#ff7900'],['airtel','🔴',t('m_airtel'),'#e40000'],['other','➕',t('m_other'),'#14a671']];
+  const statusBadge=(s)=>({paid:['ok',t('pay_paid')],pending_review:['warn',t('pay_pending')],failed:['bad',t('pay_failed')],unpaid:['',t('pay_unpaid')]}[s]||['',s]);
+  function head(){const [k,l]=statusBadge(o.payment_status);return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>#${esc(o.code)}</b> <span class="badge ${k}">${esc(l)}</span><div class="mu sm">${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.qty_total} ${esc(t('items'))}</div></div>
+      <div class="c"><div class="mu sm">${esc(t('amount_due'))}</div><div class="price" style="font-size:28px">${TT.fcfa(o.total)}</div>${TT.cur()!=='XAF'?`<div class="mu sm">≈ ${TT.money(o.total)}</div>`:''}</div></div></div>`}
+  function history(){return o.payments.length?`<div class="box"><b>${esc(t('pay_history'))}</b><div class="tw"><table><tr><th>${esc(t('date'))}</th><th>${esc(t('method'))}</th><th></th><th>${esc(t('status'))}</th></tr>${o.payments.map(p=>`<tr><td>${TT.date(p.created_at)} ${TT.time(p.created_at)}</td><td>${esc(M.find(m=>m[0]===p.method)?.[2]||p.method)}</td><td>${esc(p.mask||'')}</td><td><span class="badge ${p.status==='completed'?'ok':p.status==='failed'||p.status==='refused'?'bad':'warn'}">${esc(t('ps_'+p.status))}</span></td></tr>`).join('')}</table></div></div>`:''}
+  function draw(){
+    if(o.payment_status==='paid'){$('#app').innerHTML=head()+`<div class="alert ok">✅ ${esc(t('pay_paid_msg'))}</div>`+history()+`<a class="btn" href="/orders">${esc(t('nav_orders'))}</a>`;return}
+    $('#app').innerHTML=head()+(o.payment_status==='pending_review'?`<div class="alert">⏳ ${esc(t('pay_pending_msg'))}</div>`:'')+
+    `<div class="box"><h3>${esc(t('choose_method'))}</h3><div class="methods">${M.map(([k,i,l,c])=>`<div class="mt ${method===k?'on':''}" data-m="${k}"><span class="ic">${i}</span>${esc(l)}</div>`).join('')}</div></div><div id="form"></div>`+history();
+    document.querySelectorAll('[data-m]').forEach(e=>e.onclick=()=>{method=e.dataset.m;draw();form();document.getElementById('form').scrollIntoView({behavior:'smooth',block:'start'})});
+    if(method)form();
+  }
+  const NOTICE=()=>`<div class="notice">🔒 ${esc(t('pay_disclosure'))}${TT.cfg.settings.pay_notice?'<br>'+esc(TT.cfg.settings.pay_notice):''}</div>`;
+  function form(){
+    const f=$('#form'); let h='';
+    if(method==='card'){
+      h=`<div class="cardprev"><small>${esc(t('card_number'))}</small><div class="n" id="pn">•••• •••• •••• ••••</div><div class="row"><div><small>${esc(t('card_holder'))}</small><div id="ph">—</div></div><div><small>MM/YY</small><div id="pe">••/••</div></div></div></div>
+      <label>${esc(t('card_holder'))}</label><input id="name" autocomplete="cc-name" value="${esc(TT.user.name||'')}">
+      <label>${esc(t('card_number'))}</label><input id="num" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="1234 5678 9012 3456">
+      <div class="g2"><div><label>${esc(t('card_expiry'))}</label><input id="exp" inputmode="numeric" autocomplete="cc-exp" maxlength="7" placeholder="MM/YY"></div>
+      <div><label>CVV</label><input id="cvv" type="password" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="•••"></div></div>
+      <label>${esc(t('f_phone'))} (${esc(t('optional'))})</label><input id="phone" type="tel" value="${esc(TT.user.phone||'')}">`;
+    } else if(method==='other'){
+      h=`<div class="g2"><div><label>${esc(t('other_method'))}</label><input id="mn" list="mlist" placeholder="Bank transfer, Wave, PayPal…"><datalist id="mlist"><option>Bank transfer<option>Wave<option>PayPal<option>Western Union<option>MoneyGram<option>Cash deposit<option>Other</datalist></div>
+      <div><label>${esc(t('other_account'))}</label><input id="acc" maxlength="120"></div></div>
+      <div class="g2"><div><label>${esc(t('f_name'))}</label><input id="name" value="${esc(TT.user.name||'')}"></div><div><label>${esc(t('f_phone'))}</label><input id="phone" type="tel" value="${esc(TT.user.phone||'')}"></div></div>
+      <div class="g3"><div><label>${esc(t('other_ref'))}</label><input id="ref" maxlength="120"></div><div><label>${esc(t('other_paid'))}</label><input id="pam" value="${o.total}"></div><div><label>${esc(t('date'))}</label><input id="pdt" type="date"></div></div>
+      <label>${esc(t('other_notes'))}</label><textarea id="notes" rows="3" maxlength="800" placeholder="${esc(t('other_notes_ph'))}"></textarea>
+      <label>${esc(t('other_proof'))} (${esc(t('optional'))})</label><input id="proof" type="file" accept="image/png,image/jpeg,image/webp">`;
+    } else {
+      const lab=M.find(m=>m[0]===method)[2];
+      h=`<div class="alert sm"><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${M.find(m=>m[0]===method)[3]};margin-right:6px"></span><b>${esc(lab)}</b> — ${esc(t('mobile_hint'))}</div>
+      <label>${esc(t('mm_number'))}</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="6XX XXX XXX" value="${esc(TT.user.phone||'')}">
+      <label>${esc(t('mm_name'))}</label><input id="name" value="${esc(TT.user.name||'')}">
+      <label>${esc(t('mm_pin'))}</label><input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••">`;
+    }
+    f.innerHTML=`<div class="box"><h3>${esc(M.find(m=>m[0]===method)[2])} — ${TT.fcfa(o.total)}</h3>${h}${NOTICE()}<div id="err" class="alert bad hide"></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400"><input type="checkbox" id="ok" style="width:auto;margin-top:3px"> <span class="sm">${esc(t('pay_consent'))}</span></label>
+      <button class="btn block ok" id="send" style="margin-top:12px">${esc(t('pay_send'))} ${TT.fcfa(o.total)}</button></div>`;
+    const $$=(s)=>f.querySelector(s);
+    if(method==='card'){
+      const n=$$('#num'),e=$$('#exp'),nm=$$('#name'),upd=()=>{$$('#pn').textContent=(n.value||'•••• •••• •••• ••••');$$('#ph').textContent=nm.value||'—';$$('#pe').textContent=e.value||'••/••'};
+      n.oninput=()=>{n.value=n.value.replace(/\D/g,'').slice(0,19).replace(/(.{4})/g,'$1 ').trim();upd()};
+      e.oninput=()=>{let v=e.value.replace(/\D/g,'').slice(0,4);if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2);e.value=v;upd()};nm.oninput=upd;upd();
+    }
+    $$('#send').onclick=async()=>{
+      const er=$$('#err');er.classList.add('hide');
+      if(!$$('#ok').checked){er.textContent=t('pay_consent_err');er.classList.remove('hide');return}
+      let data={name:$$('#name')?.value||''};
+      if(method==='card')Object.assign(data,{number:$$('#num').value,expiry:$$('#exp').value,cvv:$$('#cvv').value,phone:$$('#phone').value});
+      else if(method==='other'){Object.assign(data,{methodName:$$('#mn').value,account:$$('#acc').value,phone:$$('#phone').value,reference:$$('#ref').value,paidAmount:$$('#pam').value,paidDate:$$('#pdt').value,notes:$$('#notes').value});
+        const file=$$('#proof').files[0]; if(file){if(file.size>4e6){er.textContent=t('err_proof_too_big');er.classList.remove('hide');return}data.proof=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(file)})}}
+      else Object.assign(data,{phone:$$('#phone').value,pin:$$('#pin').value});
+      $$('#send').disabled=true;
+      try{await api('/api/orders/'+encodeURIComponent(o.code)+'/pay',{body:{method,data}});
+        $('#app').innerHTML=`<div class="box c"><p style="font-size:54px;margin:0">✅</p><h2>${esc(t('pay_sent_t'))}</h2><p class="mu">${esc(t('pay_sent_p'))}</p><p><b>#${esc(o.code)}</b></p><div class="gap" style="justify-content:center"><a class="btn" href="/orders">${esc(t('nav_orders'))}</a><a class="btn alt" href="/chat">💬 ${esc(t('chat_btn'))}</a></div></div>`;
+      }catch(x){er.textContent=TT.errMsg(x);er.classList.remove('hide');$$('#send').disabled=false}
+    };
+  }
+  draw();
+});
+</script></body></html>

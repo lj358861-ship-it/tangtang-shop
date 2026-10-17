@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/css/site.css"><link rel="stylesheet" href="/admin/assets/admin.css"><script src="/admin/assets/admin.js"></script></head><body>
+<div class="login"><div class="box"><h2>🍬 Tangtang Admin</h2><form id="f"><label>Email</label><input id="e" type="email" required autocomplete="username"><label id="lp">Password</label><input id="p" type="password" required autocomplete="current-password"><div id="er" class="alert bad hide"></div><button class="btn block" style="margin-top:14px">Log in</button></form></div></div>
+<script>
+(async()=>{
+  const f=document.getElementById('f');
+  try{const r=await fetch('/api/auth/me').then(r=>r.json());if(r.user&&r.user.role==='admin'){location.href='/admin/';return}}catch{}
+  f.onsubmit=async(ev)=>{ev.preventDefault();
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e.value,password:p.value})});const d=await r.json();
+    if(r.ok&&d.role==='admin')location.href='/admin/'; else {const x=document.getElementById('er');x.textContent=r.ok?'Not an admin account':'Wrong email or password';x.classList.remove('hide');if(r.ok)fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}};
+})();
+</script></body></html>

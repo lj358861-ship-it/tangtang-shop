@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<main><div class="wrap"><h1 style="font-size:30px" data-i18n="checkout"></h1><div id="app"></div></div></main>
+<script>
+TT.ready.then(async()=>{
+  const {t,esc,api,$}=TT; if(!TT.requireLogin())return;
+  const cart=TT.cart.all(); if(!cart.length){location.href='/cart';return}
+  let q; try{q=await api('/api/quote',{body:{lines:cart.map(c=>({id:c.id,qty:c.qty})),country:TT.country(),mode:TT.mode()}})}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(TT.errMsg(e))+'</div>';return}
+  if(!q.ok){location.href='/cart';return}
+  const u=TT.user;
+  $('#app').innerHTML=`<div class="pd" style="grid-template-columns:1.2fr 1fr;align-items:start"><form class="box" id="f"><h3>📍 ${esc(t('deliv_t'))}</h3>
+    <div class="alert ok sm">${TT.flag(q.country)} <b>${esc(TT.countryName(q.country))}</b> · ${q.mode==='air'?'✈️ '+esc(t('air')):'🚢 '+esc(t('sea'))} · ${q.days} ${esc(t('days'))} — <a href="/cart" style="text-decoration:underline">${esc(t('change_country'))}</a></div>
+    <label>${esc(t('f_name'))}</label><input id="name" required value="${esc(u.name||'')}" maxlength="80">
+    <label>${esc(t('f_phone'))}</label><input id="phone" type="tel" required value="${esc(u.phone||'')}" maxlength="30">
+    <div class="g2"><div><label>${esc(t('f_city'))}</label><input id="city" required maxlength="80"></div><div><label>${esc(t('f_country'))}</label><input value="${esc(TT.countryName(q.country))}" disabled></div></div>
+    <label>${esc(t('f_addr'))}</label><textarea id="addr" required rows="3" maxlength="300" placeholder="${esc(t('f_addr_ph'))}"></textarea>
+    <label>${esc(t('f_notes'))}</label><textarea id="notes" rows="2" maxlength="500" placeholder="${esc(t('f_notes_ph'))}"></textarea>
+    <div id="err" class="alert bad hide"></div><button class="btn block" style="margin-top:14px" id="go">${esc(t('place_order'))} →</button></form>
+    <div class="box"><h3>🧾 ${esc(t('summary'))}</h3>${TT.breakdownHTML(q)}<div class="notice">${esc(t('pay_next'))}</div></div></div>`;
+  $('#f').onsubmit=async(e)=>{e.preventDefault();$('#go').disabled=true;
+    try{const r=await api('/api/orders',{body:{lines:cart,country:q.country,mode:q.mode,name:$('#name').value,phone:$('#phone').value,city:$('#city').value,address:$('#addr').value,notes:$('#notes').value}});
+      TT.cart.clear(); location.href='/pay?order='+r.code;
+    }catch(er){$('#err').textContent=TT.errMsg(er);$('#err').classList.remove('hide');$('#go').disabled=false}};
+});
+</script></body></html>

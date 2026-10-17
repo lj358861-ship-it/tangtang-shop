@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<main><div class="wrap" style="max-width:520px"><div id="app"></div></div></main>
+<script>
+TT.ready.then(()=>{
+  const {t,esc,api,$}=TT; const next=new URLSearchParams(location.search).get('next')||'/'; let tab='login';
+  const safeNext=next.startsWith('/')&&!next.startsWith('//')?next:'/';
+  function out(){
+    const u=TT.user;
+    $('#app').innerHTML=`<div class="box"><h2>👤 ${esc(u.name||u.email)}</h2><div class="mu">${esc(u.email)}${u.role==='admin'?' · <span class="badge">Admin</span>':''}</div>
+    <label>${esc(t('f_name'))}</label><input id="n" value="${esc(u.name||'')}"><label>${esc(t('f_phone'))}</label><input id="p" value="${esc(u.phone||'')}">
+    <div class="gap" style="margin-top:12px"><button class="btn" id="sv">${esc(t('save'))}</button>${u.role==='admin'?'<a class="btn alt" href="/admin/">Admin portal</a>':''}<a class="btn alt" href="/orders">${esc(t('nav_orders'))}</a><button class="btn line" id="lo">${esc(t('logout'))}</button></div></div>
+    <div class="box"><h3>🔑 ${esc(t('pw_change'))}</h3><label>${esc(t('pw_current'))}</label><input id="c" type="password"><label>${esc(t('pw_new'))}</label><input id="nw" type="password"><div id="pe" class="alert bad hide"></div><button class="btn alt" id="pc" style="margin-top:10px">${esc(t('save'))}</button></div>`;
+    $('#sv').onclick=async()=>{await api('/api/auth/profile',{method:'PUT',body:{name:$('#n').value,phone:$('#p').value,lang:TT.lang()}});TT.toast('✓')};
+    $('#lo').onclick=async()=>{await api('/api/auth/logout',{method:'POST',body:{}});location.href='/'};
+    $('#pc').onclick=async()=>{try{await api('/api/auth/password',{body:{current:$('#c').value,next:$('#nw').value}});TT.toast('✓');$('#c').value=$('#nw').value=''}catch(e){$('#pe').textContent=TT.errMsg(e);$('#pe').classList.remove('hide')}};
+  }
+  function inn(){
+    $('#app').innerHTML=`<div class="box"><div class="seg"><button data-t="login" class="${tab==='login'?'on':''}">${esc(t('login'))}</button><button data-t="reg" class="${tab==='reg'?'on':''}">${esc(t('register'))}</button></div>
+    <form id="f">${tab==='reg'?`<label>${esc(t('f_name'))}</label><input id="n" required maxlength="80" autocomplete="name"><label>${esc(t('f_phone'))}</label><input id="p" type="tel" maxlength="30" autocomplete="tel">`:''}
+    <label>${esc(t('email'))}</label><input id="e" type="email" required autocomplete="email"><label>${esc(t('password'))}</label><input id="pw" type="password" required minlength="6" autocomplete="${tab==='reg'?'new-password':'current-password'}">
+    <div id="er" class="alert bad hide"></div><button class="btn block" style="margin-top:14px">${esc(tab==='reg'?t('register'):t('login'))}</button></form></div>`;
+    document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;inn()});
+    $('#f').onsubmit=async(ev)=>{ev.preventDefault();
+      try{const r=await api('/api/auth/'+(tab==='reg'?'register':'login'),{body:{email:$('#e').value,password:$('#pw').value,name:$('#n')?.value,phone:$('#p')?.value}});
+        location.href=r.role==='admin'&&next==='/'?'/admin/':safeNext}catch(e){$('#er').textContent=TT.errMsg(e);$('#er').classList.remove('hide')}};
+  }
+  TT.user?out():inn();
+});
+</script></body></html>

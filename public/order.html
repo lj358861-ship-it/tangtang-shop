@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<main><div class="wrap"><div id="app"><div class="skel" style="height:300px"></div></div></div></main>
+<script>
+TT.ready.then(async()=>{
+  const {t,esc,api,$}=TT; if(!TT.requireLogin())return;
+  const code=new URLSearchParams(location.search).get('code'); let o;
+  try{o=await api('/api/orders/'+encodeURIComponent(code))}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return}
+  const pb={paid:['ok','pay_paid'],pending_review:['warn','pay_pending'],failed:['bad','pay_failed'],unpaid:['','pay_unpaid']}[o.payment_status]||['',o.payment_status];
+  $('#app').innerHTML=`<div class="pd" style="grid-template-columns:1.2fr 1fr;align-items:start"><div>
+    <div class="box"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0">#${o.code}</h2><span class="badge ${pb[0]}">${esc(t(pb[1]))}</span></div>
+    <div class="mu sm">${TT.date(o.created_at)} · ${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.mode==='air'?'✈️ '+esc(t('air')):'🚢 '+esc(t('sea'))}</div>
+    <div class="tl" style="margin-top:14px">${[0,1,2,3,4,5].map(i=>`<div class="${i<=o.status?'d':''}">${esc(t('st_'+i))}</div>`).join('')}</div></div>
+    <div class="box"><h3>${esc(t('items'))}</h3>${o.items.map(i=>`<div class="li" style="margin:8px 0"><img src="${i.image}" alt=""><div><b>${esc(i.name[TT.lang()]||i.name.en)}</b><div class="mu sm">${esc(i.variant||'')} ${esc(i.size==='ONE'?t('one_size'):i.size||'')}</div><div class="sm">${TT.fcfa(i.unit_price)} × ${i.qty}</div></div><b>${TT.fcfa(i.unit_price*i.qty)}</b></div>`).join('')}</div>
+    <div class="box"><h3>📍 ${esc(t('deliv_t'))}</h3><div>${esc(o.name)} · ${esc(o.phone)}<br>${esc(o.address)}, ${esc(o.city)}</div></div></div>
+    <div><div class="box"><div class="sum"><div class="row"><span>${esc(t('goods'))}</span><b>${TT.fcfa(o.goods)}</b></div><div class="row"><span>${esc(t('shipping'))} (${o.weight} kg${o.discount_pct?' · −'+o.discount_pct+'%':''})</span><b>${TT.fcfa(o.shipping)}</b></div><div class="row"><span>${esc(t('duty'))}</span><b>${TT.fcfa(o.duty)}</b></div><div class="row"><span>${esc(t('fee',{n:TT.cfg.settings.fee_pct}))}</span><b>${TT.fcfa(o.fee)}</b></div><div class="row tot price"><span>${esc(t('total'))}</span><b>${TT.fcfa(o.total)}</b></div></div>
+    ${o.payment_status==='unpaid'||o.payment_status==='failed'?`<a class="btn block ok" style="margin-top:12px" href="/pay?order=${o.code}">💳 ${esc(t('pay_now'))}</a>`:''}</div>
+    <div class="box" style="padding:0;overflow:hidden;height:420px" id="cb"></div></div></div>`;
+  TT.chatBox($('#cb'),{order:o.code});
+});
+</script></body></html>

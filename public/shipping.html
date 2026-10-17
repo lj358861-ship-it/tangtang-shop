@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<main><div class="wrap"><h1 style="font-size:32px" data-i18n="nav_shipping"></h1><p class="mu" data-i18n="ship_intro"></p>
+<div class="pd" style="grid-template-columns:1.2fr 1fr;align-items:start"><div><div class="box"><div id="cp"></div><div id="ms" style="margin-top:10px"></div></div>
+<div class="box"><h3>🧮 <span data-i18n="ship_calc"></span></h3><div class="g2"><div><label data-i18n="ship_weight"></label><input id="kg" type="number" min="0.1" step="0.1" value="10"></div><div><label data-i18n="ship_units"></label><input id="un" type="number" min="1" value="10"></div></div><div id="res" style="margin-top:10px"></div></div></div>
+<div><div class="box"><h3>📦 <span data-i18n="quota_title"></span></h3><div class="mu sm" data-i18n-html="quota_explain"></div><div id="qdemo"></div></div>
+<div class="box"><h3>🚚 <span data-i18n="tiers_t"></span></h3><div class="tw"><table id="tiers"></table></div></div></div></div>
+<div class="box"><h3>🛃 <span data-i18n="duty_t"></span></h3><div class="mu sm" data-i18n="duty_p"></div><div class="tw"><table id="duty"></table></div></div>
+<div class="box"><div class="row" style="flex-wrap:wrap"><h3 style="margin:0">🌍 <span data-i18n="all_rates"></span></h3><input id="fq" style="max-width:260px" data-i18n-ph="search_country"></div><div class="tw" style="max-height:480px;overflow:auto"><table id="rates"></table></div></div>
+</div></main>
+<script>
+TT.ready.then(()=>{
+  const {t,esc,$}=TT, C=()=>TT.cfg.countries.find(c=>c.code===TT.country());
+  const tiers=TT.cfg.settings.qty_tiers.slice().sort((a,b)=>a[0]-b[0]);
+  function calc(){const c=C(),kg=Math.max(.1,+$('#kg').value||0),un=Math.max(1,+$('#un').value||1),rate=TT.mode()==='air'?c.air_per_kg:c.sea_per_kg;let d=0;tiers.forEach(([m,x])=>{if(un>=m)d=x});
+    const gross=kg*rate,net=Math.round(gross*(1-d/100));
+    $('#res').innerHTML=`<div class="sum"><div class="row"><span>${TT.flag(c.code)} ${esc(TT.countryName(c.code))} · ${esc(t(TT.mode()))}</span><b>${TT.fcfa(rate)}/kg</b></div><div class="row"><span>${kg} kg × ${TT.fcfa(rate)}</span><b>${TT.fcfa(gross)}</b></div><div class="row"><span>${esc(t('tier_now',{n:un,d:d}))}</span><b>−${TT.fcfa(gross-net)}</b></div><div class="row tot price"><span>${esc(t('shipping'))}</span><b>${TT.fcfa(net)}</b></div><div class="mu sm">⏱ ${TT.mode()==='air'?c.air_days:c.sea_days} ${esc(t('days'))}</div></div>`}
+  const ms=TT.modeSwitch($('#ms'),calc); TT.countryPicker($('#cp'),()=>{ms.redraw();calc()});
+  $('#kg').oninput=$('#un').oninput=calc; calc();
+  const min=TT.cfg.settings.min_order; $('#qdemo').innerHTML=[25,60,100].map(p=>TT.quotaHTML({quota:p,ok:p>=100,missing:Math.round(min*(100-p)/100),minOrder:min})).join('');
+  $('#tiers').innerHTML=`<tr><th>${esc(t('ship_units'))}</th><th class="r">${esc(t('discount'))}</th></tr>`+tiers.map(([m,d],i)=>`<tr><td>${m}${tiers[i+1]?' – '+(tiers[i+1][0]-1):'+'}</td><td class="r"><b>${d?'−'+d+'%':'—'}</b></td></tr>`).join('');
+  $('#duty').innerHTML=`<tr><th>${esc(t('category'))}</th><th class="r">${esc(t('duty'))}</th></tr>`+TT.cfg.categories.map(c=>`<tr><td>${TT.EMOJI[c.key]||''} ${esc(TT.catName(c.key))}</td><td class="r">${Math.round(c.duty_rate*100)}%</td></tr>`).join('');
+  const rates=(q)=>{$('#rates').innerHTML=`<tr><th>${esc(t('f_country'))}</th><th class="r">✈️ /kg</th><th class="r">${esc(t('days'))}</th><th class="r">🚢 /kg</th><th class="r">${esc(t('days'))}</th></tr>`+TT.cfg.countries.filter(c=>!q||(TT.countryName(c.code)+c.code).toLowerCase().includes(q.toLowerCase())).sort((a,b)=>TT.countryName(a.code).localeCompare(TT.countryName(b.code))).map(c=>`<tr><td>${TT.flag(c.code)} ${esc(TT.countryName(c.code))}</td><td class="r">${TT.fcfa(c.air_per_kg)}</td><td class="r">${c.air_days}</td><td class="r">${TT.fcfa(c.sea_per_kg)}</td><td class="r">${c.sea_days}</td></tr>`).join('')};
+  rates(''); $('#fq').oninput=e=>rates(e.target.value);
+});
+</script></body></html>
