@@ -96,7 +96,7 @@ const productOut = (p) => ({
   sizes: J(p.sizes, []), isNew: !!p.is_new, active: !!p.active, needsPrice: !!p.needs_price,
   final: Math.round(p.price * (1 - (p.discount || 0) / 100)),
 });
-const publicSettings = () => ({ shop_name: setting('shop_name'), min_order: setting('min_order'), fee_pct: setting('fee_pct'), qty_tiers: setting('qty_tiers'), fx: setting('fx'), support_email: setting('support_email'), support_whatsapp: setting('support_whatsapp'), pay_notice: setting('pay_notice') });
+const publicSettings = () => ({ shop_name: setting('shop_name'), min_order: setting('min_order'), fee_pct: setting('fee_pct'), qty_tiers: setting('qty_tiers'), price_tiers: setting('price_tiers'), fx: setting('fx'), fx_auto: setting('fx_auto'), support_email: setting('support_email'), support_whatsapp: setting('support_whatsapp'), pay_notice: setting('pay_notice') });
 app.get('/api/config', (req, res) => res.json({
   settings: publicSettings(),
   countries: all('SELECT code,region,air_per_kg,sea_per_kg,air_days,sea_days,featured FROM countries WHERE enabled=1 ORDER BY featured DESC, code'),
@@ -131,14 +131,17 @@ function quote(lines, countryCode, mode) {
   if (!['air', 'sea'].includes(mode)) throw Object.assign(new Error('bad_mode'), { status: 400 });
   if (!Array.isArray(lines) || !lines.length || lines.length > 100) throw Object.assign(new Error('empty_cart'), { status: 400 });
   const items = []; let goods = 0, weight = 0, qtyTotal = 0;
+  const ptiers = setting('price_tiers').slice().sort((a, b) => a[0] - b[0]);
   for (const l of lines) {
     const p = get('SELECT * FROM products WHERE id=? AND active=1', +l.id); const qty = Math.floor(+l.qty);
     if (!p) throw Object.assign(new Error('bad_product'), { status: 400 });
     if (!(qty >= 1 && qty <= 100000)) throw Object.assign(new Error('bad_qty'), { status: 400 });
     if (qty < p.moq) throw Object.assign(new Error('below_moq:' + p.id + ':' + p.moq), { status: 400 });
-    const unit = Math.round(p.price * (1 - (p.discount || 0) / 100));
+    const base = p.price * (1 - (p.discount || 0) / 100);
+    let tier = 0; for (const [m, d] of ptiers) if (qty >= m) tier = d;          // buy more of this product -> lower unit price
+    const unit = Math.round(base * (1 - tier / 100));
     const duty = (get('SELECT duty_rate FROM categories WHERE key=?', p.cat) || { duty_rate: .15 }).duty_rate;
-    items.push({ p, qty, unit, line: unit * qty, w: p.kg * qty, duty, variant: String(l.variant ?? '').slice(0, 120), size: String(l.size ?? '').slice(0, 30), image: l.image });
+    items.push({ p, qty, unit, tier, base: Math.round(base), line: unit * qty, w: p.kg * qty, duty, variant: String(l.variant ?? '').slice(0, 120), size: String(l.size ?? '').slice(0, 30), image: l.image });
     goods += unit * qty; weight += p.kg * qty; qtyTotal += qty;
   }
   const tiers = setting('qty_tiers').slice().sort((a, b) => a[0] - b[0]);
@@ -146,14 +149,14 @@ function quote(lines, countryCode, mode) {
   const rate = mode === 'air' ? country.air_per_kg : country.sea_per_kg;
   const shipGross = weight * rate, shipping = Math.round(shipGross * (1 - disc / 100));
   let duty = 0;
-  for (const it of items) { it.ship = weight ? Math.round(shipping * it.w / weight) : 0; duty += (it.line + it.ship) * it.duty; }
+  for (const it of items) { it.ship = weight ? Math.round(shipping * it.w / weight) : 0; duty += it.line * it.duty; }   // customs estimated on the goods value
   duty = Math.round(duty); const fee = Math.round(goods * setting('fee_pct') / 100);
   const min = setting('min_order'), quota = Math.min(100, Math.floor(goods / min * 100));
   return {
     country: country.code, mode, goods, weight: Math.round(weight * 100) / 100, qtyTotal, rate, discountPct: disc, shipping, duty, fee,
     total: goods + shipping + duty + fee, minOrder: min, quota, ok: goods >= min, missing: Math.max(0, min - goods),
     days: mode === 'air' ? country.air_days : country.sea_days,
-    lines: items.map(i => ({ id: i.p.id, qty: i.qty, unit: i.unit, line: i.line, share: Math.min(100, Math.round(i.line / min * 1000) / 10), ship: i.ship })),
+    lines: items.map(i => ({ id: i.p.id, qty: i.qty, unit: i.unit, base: i.base, tier: i.tier, line: i.line, share: Math.min(100, Math.round(i.line / min * 1000) / 10), ship: i.ship })),
     _items: items,
   };
 }
@@ -396,7 +399,9 @@ A.put('/settings', wrap((req, res) => {
   if (b.min_order !== undefined) setSetting('min_order', Math.max(0, Math.round(+b.min_order)));
   if (b.fee_pct !== undefined) setSetting('fee_pct', Math.max(0, Math.min(50, +b.fee_pct)));
   if (Array.isArray(b.qty_tiers)) setSetting('qty_tiers', b.qty_tiers.map(([m, d]) => [Math.max(0, Math.round(+m)), Math.max(0, Math.min(90, +d))]));
-  if (b.fx && typeof b.fx === 'object') setSetting('fx', { XAF: 1, EUR: +b.fx.EUR || 0.001524, USD: +b.fx.USD || 0.0017, CNY: +b.fx.CNY || 0.0119 });
+  if (Array.isArray(b.price_tiers)) setSetting('price_tiers', b.price_tiers.map(([m, d]) => [Math.max(0, Math.round(+m)), Math.max(0, Math.min(90, +d))]));
+  if (b.fx && typeof b.fx === 'object') { const cur = setting('fx'); for (const [k, v] of Object.entries(b.fx)) if (/^[A-Z]{3}$/.test(k) && +v > 0) cur[k] = +v; cur.XAF = 1; setSetting('fx', cur); }
+  if (b.fx_auto !== undefined) setSetting('fx_auto', !!b.fx_auto);
   for (const k of ['shop_name', 'support_email', 'support_whatsapp', 'pay_notice']) if (b[k] !== undefined) setSetting(k, String(b[k]).slice(0, 500));
   audit(req.user.id, 'settings.update', ''); res.json({ ok: true });
 }));
@@ -415,6 +420,19 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], m
   setHeaders: (res, p) => { if (p.includes(path.join('public', 'img', 'p'))) res.set('Cache-Control', 'public, max-age=2592000, immutable'); } }));
 app.use((req, res) => req.path.startsWith('/api/') ? err(res, 404, 'not_found') : res.status(404).sendFile(path.join(__dirname, 'public', '404.html')));
 app.use((e, req, res, next) => { console.error(e); if (res.headersSent) return; err(res, 500, 'server_error'); });
+
+// ---------- currency rates: refreshed daily from a free public API (admin can switch this off) ----------
+async function refreshFx() {
+  try {
+    if (setting('fx_auto') === false) return;
+    const r = await fetch('https://open.er-api.com/v6/latest/XAF', { signal: AbortSignal.timeout(8000) }); if (!r.ok) return;
+    const d = await r.json(); if (d.result !== 'success' || !d.rates) return;
+    const cur = setting('fx'); let n = 0;
+    for (const k of Object.keys(cur)) if (k !== 'XAF' && d.rates[k] > 0) { cur[k] = +Number(d.rates[k]).toPrecision(6); n++; }
+    if (n) { setSetting('fx', cur); console.log('Currency rates refreshed (' + n + ')'); }
+  } catch (e) { /* keep the stored rates */ }
+}
+setTimeout(refreshFx, 5000); setInterval(refreshFx, 12 * 3600e3).unref();
 
 const PORT = +process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Tangtang running on :${PORT}  (data: ${D.DATA_DIR})`));

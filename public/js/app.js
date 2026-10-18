@@ -22,12 +22,14 @@
     $$('[data-i18n-title]', root).forEach(e => e.title = t(e.dataset.i18nTitle));
     document.documentElement.lang = lang;
   };
-  // money (all prices are stored in FCFA)
+  // money (all prices are stored in FCFA, other currencies use the admin / daily-refreshed rates)
+  TT.currencies = () => { const fx = (TT.cfg && TT.cfg.settings.fx) || { XAF: 1 }; return ['XAF', ...Object.keys(fx).filter(k => k !== 'XAF')]; };
   TT.money = (v) => {
-    const fx = (TT.cfg?.settings.fx) || { XAF: 1, EUR: .001524, USD: .0017, CNY: .0119 };
-    if (cur === 'XAF') return Math.round(v).toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
-    const x = v * fx[cur]; const sym = { EUR: '€', USD: '$', CNY: '¥' }[cur];
-    return (cur === 'EUR' ? '' : sym) + x.toLocaleString(lang === 'zh' ? 'zh-CN' : lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (cur === 'EUR' ? ' €' : '');
+    const fx = (TT.cfg && TT.cfg.settings.fx) || {};
+    if (cur === 'XAF' || !fx[cur]) return Math.round(v).toLocaleString('fr-FR').replace(/\u202f|\u00a0/g, ' ') + ' FCFA';
+    const x = v * fx[cur]; const big = ['NGN', 'KES'].includes(cur);
+    try { return new Intl.NumberFormat(lang === 'zh' ? 'zh-CN' : lang, { style: 'currency', currency: cur, minimumFractionDigits: big ? 0 : 2, maximumFractionDigits: big ? 0 : 2 }).format(x); }
+    catch { return x.toFixed(2) + ' ' + cur; }
   };
   TT.fcfa = (v) => Math.round(v).toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
   TT.pname = (p) => (p.name && (p.name[lang] || p.name.en || p.name.fr)) || '';
@@ -119,16 +121,16 @@
   function layout() {
     const path = location.pathname.replace(/\.html$/, '').replace(/\/index$/, '') || '/';
     const h = document.createElement('header'); h.className = 'hdr';
-    h.innerHTML = `<div class="wrap"><a class="logo" href="/">🍬 Tangtang<small>糖糖</small></a>
+    h.innerHTML = `<div class="wrap"><a class="logo" href="/"><img src="/img/brand/logo-96.png" alt="Tangtang"><span>Tangtang<small>糖糖</small></span></a>
       <nav class="nav" id="nav">${NAV.map(([u, k]) => `<a href="${u}" class="${path === u ? 'on' : ''}" data-i18n="${k}"></a>`).join('')}</nav>
       <div class="tools"><select id="lgsel" aria-label="Language">${Object.entries(LANGS).map(([k, v]) => `<option value="${k}" title="${v}" ${k === lang ? 'selected' : ''}>${k === 'zh' ? '中文' : k.toUpperCase()}</option>`).join('')}</select>
-      <select id="cusel" aria-label="Currency">${[['XAF', 'FCFA'], ['EUR', 'EUR'], ['USD', 'USD'], ['CNY', 'CNY']].map(([k, v]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <select id="cusel" aria-label="Currency">${TT.currencies().map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${k === 'XAF' ? 'FCFA' : k}</option>`).join('')}</select>
       <a class="ib" href="/cart" title="Cart">🛒<span class="n hide" id="cartn"></span></a>
       <a class="ib" href="/account" id="acc" title="Account">👤</a>
       <button class="ib burger" id="burger" aria-label="Menu">☰</button></div></div>`;
     document.body.prepend(h);
     const f = document.createElement('footer');
-    f.innerHTML = `<div class="wrap"><div class="cols"><div><h4>🍬 Tangtang 糖糖</h4><div data-i18n="foot_tag"></div></div>
+    f.innerHTML = `<div class="wrap"><div class="cols"><div><h4 class="fl"><img src="/img/brand/logo-96.png" alt="">Tangtang 糖糖</h4><div data-i18n="foot_tag"></div><div class="payicons"><img class="w" src="/img/brand/visa.png" alt="Visa"><img class="w" src="/img/brand/mastercard.png" alt="Mastercard" style="padding:2px 6px"><img src="/img/brand/mtn.png" alt="MTN MoMo"><img src="/img/brand/orange.png" alt="Orange Money"><img src="/img/brand/airtel.png" alt="Airtel Money"></div></div>
       <div><h4 data-i18n="foot_shop"></h4><a href="/shop" data-i18n="nav_shop"></a><br><a href="/shipping" data-i18n="nav_shipping"></a><br><a href="/help" data-i18n="nav_help"></a></div>
       <div><h4 data-i18n="foot_acc"></h4><a href="/account" data-i18n="nav_account"></a><br><a href="/orders" data-i18n="nav_orders"></a><br><a href="/chat" data-i18n="nav_chat"></a></div>
       <div><h4 data-i18n="foot_min_t"></h4><div data-i18n="foot_min"></div><br><a href="/admin/" class="sm" style="opacity:.55">Admin</a></div></div></div>`;
@@ -184,6 +186,7 @@
   TT.ready = (async () => {
     try { [TT.cfg, { user: TT.user }] = await Promise.all([TT.api('/api/config'), TT.api('/api/auth/me')]); } catch (e) { console.error(e); TT.cfg = { settings: { min_order: 50000, fee_pct: 5, qty_tiers: [], fx: {} }, countries: [], categories: [] }; }
     if (!TT.cfg.countries.find(c => c.code === country)) country = 'CM';
+    if (!TT.currencies().includes(cur)) cur = 'XAF';
     layout(); chatWidget();
     if (TT.user) { const a = $('#acc'); a.title = TT.user.email; a.style.background = '#fff'; a.style.color = 'var(--pk-d)'; }
     TT.i18n(); return TT;

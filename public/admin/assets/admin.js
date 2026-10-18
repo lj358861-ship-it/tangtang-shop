@@ -31,7 +31,7 @@
     if (!me || me.role !== 'admin') { location.href = '/admin/login.html'; return null; }
     const cur = location.pathname.split('/').pop() || 'index.html';
     const side = document.createElement('aside'); side.className = 'side';
-    side.innerHTML = `<div class="brand">🍬 Tangtang <small style="font-weight:500;opacity:.7">Admin</small></div>` +
+    side.innerHTML = `<div class="brand"><img src="/img/brand/logo-48.png" width="28" height="28" style="border-radius:8px;vertical-align:middle;margin-right:6px" alt=""> Tangtang <small style="font-weight:500;opacity:.7">Admin</small></div>` +
       NAV.map(([f, i, en, fr, b]) => `<a href="/admin/${f}" class="${(cur === f || (cur === '' && f === 'index.html')) ? 'on' : ''}"><span>${i} ${A.T(en, fr)}</span>${b ? `<span class="n hide" id="b-${b}"></span>` : ''}</a>`).join('') +
       `<div class="sp"></div><a href="/" target="_blank">🛒 ${A.T('View shop', 'Voir la boutique')}</a><a href="#" id="lo">⎋ ${A.T('Log out', 'Déconnexion')}</a>
        <select id="al"><option value="en" ${lang === 'en' ? 'selected' : ''}>English</option><option value="fr" ${lang === 'fr' ? 'selected' : ''}>Français</option></select>`;

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
 <main><div class="wrap" style="max-width:900px"><h1 style="font-size:30px" data-i18n="pay_title"></h1><div id="app"><div class="skel" style="height:300px"></div></div></div></main>
 <script>
 TT.ready.then(async()=>{
@@ -6,7 +6,8 @@ TT.ready.then(async()=>{
   const code=new URLSearchParams(location.search).get('order'); let o;
   try{o=await api('/api/orders/'+encodeURIComponent(code))}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return}
   let method=null;
-  const M=[['card','💳',t('m_card'),'#7a3d57'],['mtn','📲',t('m_mtn'),'#ffcc00'],['orange','🟠',t('m_orange'),'#ff7900'],['airtel','🔴',t('m_airtel'),'#e40000'],['other','➕',t('m_other'),'#14a671']];
+  const LG=(f,c='')=>`<img class="pl ${c}" src="/img/brand/${f}.png" alt="" loading="lazy">`;
+  const M=[['card',LG('visa','v')+LG('mc-mark','m'),t('m_card'),'#1a1f71'],['mtn',LG('mtn'),t('m_mtn'),'#ffcc00'],['orange',LG('orange'),t('m_orange'),'#ff7900'],['airtel',LG('airtel'),t('m_airtel'),'#e40000'],['other','<span class="plus">+</span>',t('m_other'),'#14a671']];
   const statusBadge=(s)=>({paid:['ok',t('pay_paid')],pending_review:['warn',t('pay_pending')],failed:['bad',t('pay_failed')],unpaid:['',t('pay_unpaid')]}[s]||['',s]);
   function head(){const [k,l]=statusBadge(o.payment_status);return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>#${esc(o.code)}</b> <span class="badge ${k}">${esc(l)}</span><div class="mu sm">${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.qty_total} ${esc(t('items'))}</div></div>
       <div class="c"><div class="mu sm">${esc(t('amount_due'))}</div><div class="price" style="font-size:28px">${TT.fcfa(o.total)}</div>${TT.cur()!=='XAF'?`<div class="mu sm">≈ ${TT.money(o.total)}</div>`:''}</div></div></div>`}
@@ -14,7 +15,7 @@ TT.ready.then(async()=>{
   function draw(){
     if(o.payment_status==='paid'){$('#app').innerHTML=head()+`<div class="alert ok">✅ ${esc(t('pay_paid_msg'))}</div>`+history()+`<a class="btn" href="/orders">${esc(t('nav_orders'))}</a>`;return}
     $('#app').innerHTML=head()+(o.payment_status==='pending_review'?`<div class="alert">⏳ ${esc(t('pay_pending_msg'))}</div>`:'')+
-    `<div class="box"><h3>${esc(t('choose_method'))}</h3><div class="methods">${M.map(([k,i,l,c])=>`<div class="mt ${method===k?'on':''}" data-m="${k}"><span class="ic">${i}</span>${esc(l)}</div>`).join('')}</div></div><div id="form"></div>`+history();
+    `<div class="box"><h3>${esc(t('choose_method'))}</h3><div class="methods">${M.map(([k,i,l,c])=>`<div class="mt ${method===k?'on':''}" data-m="${k}"><span class="ic">${i}</span><span class="ml">${esc(l)}</span></div>`).join('')}</div></div><div id="form"></div>`+history();
     document.querySelectorAll('[data-m]').forEach(e=>e.onclick=()=>{method=e.dataset.m;draw();form();document.getElementById('form').scrollIntoView({behavior:'smooth',block:'start'})});
     if(method)form();
   }
@@ -22,7 +23,7 @@ TT.ready.then(async()=>{
   function form(){
     const f=$('#form'); let h='';
     if(method==='card'){
-      h=`<div class="cardprev"><small>${esc(t('card_number'))}</small><div class="n" id="pn">•••• •••• •••• ••••</div><div class="row"><div><small>${esc(t('card_holder'))}</small><div id="ph">—</div></div><div><small>MM/YY</small><div id="pe">••/••</div></div></div></div>
+      h=`<div class="cardprev" id="cp"><img class="cb" id="cb" alt=""><small>${esc(t('card_number'))}</small><div class="n" id="pn">•••• •••• •••• ••••</div><div class="row"><div><small>${esc(t('card_holder'))}</small><div id="ph">—</div></div><div><small>MM/YY</small><div id="pe">••/••</div></div></div><div class="chip"></div></div>
       <label>${esc(t('card_holder'))}</label><input id="name" autocomplete="cc-name" value="${esc(TT.user.name||'')}">
       <label>${esc(t('card_number'))}</label><input id="num" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="1234 5678 9012 3456">
       <div class="g2"><div><label>${esc(t('card_expiry'))}</label><input id="exp" inputmode="numeric" autocomplete="cc-exp" maxlength="7" placeholder="MM/YY"></div>
@@ -47,7 +48,7 @@ TT.ready.then(async()=>{
       <button class="btn block ok" id="send" style="margin-top:12px">${esc(t('pay_send'))} ${TT.fcfa(o.total)}</button></div>`;
     const $$=(s)=>f.querySelector(s);
     if(method==='card'){
-      const n=$$('#num'),e=$$('#exp'),nm=$$('#name'),upd=()=>{$$('#pn').textContent=(n.value||'•••• •••• •••• ••••');$$('#ph').textContent=nm.value||'—';$$('#pe').textContent=e.value||'••/••'};
+      const n=$$('#num'),e=$$('#exp'),nm=$$('#name'),brand=(v)=>{v=v.replace(/\D/g,'');if(/^4/.test(v))return'visa';if(/^(5[1-5]|2(2[2-9][1-9]|2[3-9]|[3-6]|7[01]|720))/.test(v))return'mastercard';return''},upd=()=>{const b=brand(n.value),cp=$$('#cp'),ci=$$('#cb');cp.className='cardprev '+b;ci.style.display=b?'block':'none';if(b)ci.src=b==='visa'?'/img/brand/visa.png':'/img/brand/mc-mark.png';$$('#pn').textContent=(n.value||'•••• •••• •••• ••••');$$('#ph').textContent=nm.value||'—';$$('#pe').textContent=e.value||'••/••'};
       n.oninput=()=>{n.value=n.value.replace(/\D/g,'').slice(0,19).replace(/(.{4})/g,'$1 ').trim();upd()};
       e.oninput=()=>{let v=e.value.replace(/\D/g,'').slice(0,4);if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2);e.value=v;upd()};nm.oninput=upd;upd();
     }

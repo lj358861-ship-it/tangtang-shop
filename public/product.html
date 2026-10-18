@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css"><script src="/js/i18n.js"></script><script src="/js/app.js"></script></head><body>
 <main><div class="wrap"><div id="pd"><div class="skel" style="height:420px"></div></div></div></main>
 <script>
 TT.ready.then(async()=>{
@@ -11,6 +11,7 @@ TT.ready.then(async()=>{
     $('#pd').innerHTML=`<div class="pd"><div><img class="main" src="${p.images[vi]}" alt=""><div class="th">${p.images.map((x,j)=>`<img class="${j===vi?'on':''}" data-j="${j}" src="${x}" alt="">`).join('')}</div></div>
     <div><div class="mu sm">${esc(TT.catName(p.cat))} · ${esc(p.sku)}</div><h1 style="font-size:28px">${esc(TT.pname(p))}</h1>
     <div style="font-size:26px" class="price">${TT.money(p.final)} ${p.discount?`<span class="old" style="font-size:15px">${TT.money(p.price)}</span> <span class="badge">-${p.discount}%</span>`:''}</div>
+    <div class="box" style="margin:10px 0"><b>📉 ${esc(t('vol_title'))}</b><div class="tiers" id="tiers"></div></div>
     <div class="mu sm">${esc(t('per_unit'))} · ${esc(t('moq'))}: <b>${p.moq}</b> · ${p.kg} kg ${p.sold?` · 🔥 ${p.sold}+ ${esc(t('sold'))}`:''}</div>
     <div class="box"><b>${esc(t('desc'))}</b><p style="margin:6px 0">${esc(TT.pdesc(p))}</p>
       ${vn?`<div class="sm"><b>${esc(t('design'))}:</b> ${esc(vn)}</div>`:p.images.length>1?`<div class="sm mu">${esc(t('design'))}: #${vi+1}/${p.images.length}</div>`:''}
@@ -30,7 +31,9 @@ TT.ready.then(async()=>{
   async function calc(){
     const n=Math.max(p.moq,Math.floor(+$('#q').value)||p.moq);
     try{const r=await api('/api/quote',{body:{lines:[{id:p.id,qty:n}],country:TT.country(),mode:TT.mode()}});
-      $('#cl').innerHTML=`<div class="sm mu" style="margin-bottom:6px">${TT.flag(r.country)} ${esc(TT.countryName(r.country))} · ${r.days} ${esc(t('days'))} — <a href="/cart" style="color:var(--pk-d);text-decoration:underline">${esc(t('change_country'))}</a></div>`+TT.breakdownHTML(r)+
+      const L=r.lines[0]; const pt=TT.cfg.settings.price_tiers.slice().sort((a,b)=>a[0]-b[0]);
+      $('#tiers').innerHTML=pt.map(([m,d],i)=>{const nx=pt[i+1];const active=n>=m&&(!nx||n<nx[0]);return `<div class="t ${active?'on':''}">${m===0?'1':m}${nx?'–'+(nx[0]-1):'+'} ${esc(t('units_short'))}<b>${TT.money(Math.round(p.final*(1-d/100)))}</b>${d?`−${d}%`:'&nbsp;'}</div>`}).join('');
+      $('#cl').innerHTML=(L.tier?`<div class="alert ok sm">🎉 ${esc(t('tier_price_line',{n:L.tier,p:TT.money(L.unit)}))}</div>`:'')+`<div class="sm mu" style="margin-bottom:6px">${TT.flag(r.country)} ${esc(TT.countryName(r.country))} · ${r.days} ${esc(t('days'))} — <a href="/cart" style="color:var(--pk-d);text-decoration:underline">${esc(t('change_country'))}</a></div>`+TT.breakdownHTML(r)+
       `<div class="notice">${esc(t('quota_contrib',{n:Math.min(100,Math.round(r.goods/r.minOrder*1000)/10)}))}</div>`;
     }catch(e){$('#cl').textContent=TT.errMsg(e)}
   }
