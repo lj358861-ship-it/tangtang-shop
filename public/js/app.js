@@ -31,6 +31,14 @@
     try { return new Intl.NumberFormat(lang === 'zh' ? 'zh-CN' : lang, { style: 'currency', currency: cur, minimumFractionDigits: big ? 0 : 2, maximumFractionDigits: big ? 0 : 2 }).format(x); }
     catch { return x.toFixed(2) + ' ' + cur; }
   };
+  TT.curName = (k) => { if (k === 'XAF') return 'FCFA — ' + (lang === 'fr' ? 'Franc CFA' : lang === 'zh' ? '中非法郎' : 'CFA franc'); try { return k + ' — ' + new Intl.DisplayNames([lang === 'zh' ? 'zh-CN' : lang], { type: 'currency' }).of(k); } catch { return k; } };
+  TT.curOptions = (sel) => TT.currencies().map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(TT.curName(k))}</option>`).join('');
+  TT.langOptions = (sel) => Object.entries(LANGS).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
+  TT.setPrefs = async (p, reload = true) => {
+    if (p.lang && LANGS[p.lang]) { lang = p.lang; LS.set('tt_lang', lang); } if (p.cur) { cur = p.cur; LS.set('tt_cur', cur); }
+    if (TT.user) { try { await TT.api('/api/auth/prefs', { method: 'PUT', body: { lang, cur } }); } catch {} }
+    if (reload) location.reload();
+  };
   TT.fcfa = (v) => Math.round(v).toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
   TT.pname = (p) => (p.name && (p.name[lang] || p.name.en || p.name.fr)) || '';
   TT.pdesc = (p) => (p.desc && (p.desc[lang] || p.desc.en)) || '';
@@ -117,14 +125,14 @@
     <div class="row tot price"><span>${esc(t('total'))}</span><b>${TT.money(q.total)}</b></div></div>`;
 
   // ---------- layout ----------
-  const NAV = [['/', 'nav_home'], ['/shop', 'nav_shop'], ['/shipping', 'nav_shipping'], ['/orders', 'nav_orders'], ['/help', 'nav_help']];
+  const NAV = [['/', 'nav_home'], ['/shop', 'nav_shop'], ['/shipping', 'nav_shipping'], ['/orders', 'nav_orders'], ['/wallet', 'nav_wallet'], ['/help', 'nav_help']];
   function layout() {
     const path = location.pathname.replace(/\.html$/, '').replace(/\/index$/, '') || '/';
     const h = document.createElement('header'); h.className = 'hdr';
     h.innerHTML = `<div class="wrap"><a class="logo" href="/"><img src="/img/brand/logo-96.png" alt="Tangtang"><span>Tangtang<small>糖糖</small></span></a>
       <nav class="nav" id="nav">${NAV.map(([u, k]) => `<a href="${u}" class="${path === u ? 'on' : ''}" data-i18n="${k}"></a>`).join('')}</nav>
-      <div class="tools"><select id="lgsel" aria-label="Language">${Object.entries(LANGS).map(([k, v]) => `<option value="${k}" title="${v}" ${k === lang ? 'selected' : ''}>${k === 'zh' ? '中文' : k.toUpperCase()}</option>`).join('')}</select>
-      <select id="cusel" aria-label="Currency">${TT.currencies().map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${k === 'XAF' ? 'FCFA' : k}</option>`).join('')}</select>
+      <div class="tools"><button class="lcb" id="lcb" aria-haspopup="true" aria-expanded="false" title="${esc(t('pref_title'))}">🌐 <b>${lang === 'zh' ? '中文' : lang.toUpperCase()}</b><i>${cur === 'XAF' ? 'FCFA' : cur}</i></button>
+      <a class="ib wal hide" href="/wallet" id="walb" title="${esc(t('wallet_title'))}">💰<span id="walv"></span></a>
       <a class="ib" href="/cart" title="Cart">🛒<span class="n hide" id="cartn"></span></a>
       <a class="ib" href="/account" id="acc" title="Account">👤</a>
       <button class="ib burger" id="burger" aria-label="Menu">☰</button></div></div>`;
@@ -132,11 +140,17 @@
     const f = document.createElement('footer');
     f.innerHTML = `<div class="wrap"><div class="cols"><div><h4 class="fl"><img src="/img/brand/logo-96.png" alt="">Tangtang 糖糖</h4><div data-i18n="foot_tag"></div><div class="payicons"><img class="w" src="/img/brand/visa.png" alt="Visa"><img class="w" src="/img/brand/mastercard.png" alt="Mastercard" style="padding:2px 6px"><img src="/img/brand/mtn.png" alt="MTN MoMo"><img src="/img/brand/orange.png" alt="Orange Money"><img src="/img/brand/airtel.png" alt="Airtel Money"></div></div>
       <div><h4 data-i18n="foot_shop"></h4><a href="/shop" data-i18n="nav_shop"></a><br><a href="/shipping" data-i18n="nav_shipping"></a><br><a href="/help" data-i18n="nav_help"></a></div>
-      <div><h4 data-i18n="foot_acc"></h4><a href="/account" data-i18n="nav_account"></a><br><a href="/orders" data-i18n="nav_orders"></a><br><a href="/chat" data-i18n="nav_chat"></a></div>
+      <div><h4 data-i18n="foot_acc"></h4><a href="/account" data-i18n="nav_account"></a><br><a href="/orders" data-i18n="nav_orders"></a><br><a href="/wallet" data-i18n="nav_wallet"></a><br><a href="/chat" data-i18n="nav_chat"></a></div>
       <div><h4 data-i18n="foot_min_t"></h4><div data-i18n="foot_min"></div><br><a href="/admin/" class="sm" style="opacity:.55">Admin</a></div></div></div>`;
     document.body.appendChild(f);
-    $('#lgsel').onchange = (e) => { lang = e.target.value; LS.set('tt_lang', lang); location.reload(); };
-    $('#cusel').onchange = (e) => { cur = e.target.value; LS.set('tt_cur', cur); location.reload(); };
+    // language + currency popover (full names, easy to read on a phone)
+    const pop = document.createElement('div'); pop.id = 'lcp'; pop.className = 'lcp hide';
+    pop.innerHTML = `<label>🌐 ${esc(t('pref_lang'))}</label><select id="lgsel">${TT.langOptions(lang)}</select><label>💱 ${esc(t('pref_cur'))}</label><select id="cusel">${TT.curOptions(cur)}</select>`;
+    h.appendChild(pop);
+    $('#lcb').onclick = (e) => { e.stopPropagation(); const o = pop.classList.toggle('hide'); $('#lcb').setAttribute('aria-expanded', String(!o)); };
+    document.addEventListener('click', (e) => { if (!pop.contains(e.target) && e.target !== $('#lcb')) pop.classList.add('hide'); });
+    $('#lgsel').onchange = (e) => TT.setPrefs({ lang: e.target.value });
+    $('#cusel').onchange = (e) => TT.setPrefs({ cur: e.target.value });
     $('#burger').onclick = () => $('#nav').classList.toggle('open');
     TT.cart.badge();
   }
@@ -185,10 +199,18 @@
   // ---------- boot ----------
   TT.ready = (async () => {
     try { [TT.cfg, { user: TT.user }] = await Promise.all([TT.api('/api/config'), TT.api('/api/auth/me')]); } catch (e) { console.error(e); TT.cfg = { settings: { min_order: 50000, fee_pct: 5, qty_tiers: [], fx: {} }, countries: [], categories: [] }; }
+    if (TT.user) {   // once per browser session: apply the language / currency saved in the account
+      let ch = false;
+      try { if (!sessionStorage.getItem('tt_sync')) { sessionStorage.setItem('tt_sync', '1');
+        if (TT.user.lang && LANGS[TT.user.lang] && TT.user.lang !== lang) { LS.set('tt_lang', TT.user.lang); ch = true; }
+        if (TT.user.cur && TT.user.cur !== cur) { LS.set('tt_cur', TT.user.cur); ch = true; } } } catch {}
+      if (ch) { location.reload(); return TT; }
+    }
     if (!TT.cfg.countries.find(c => c.code === country)) country = 'CM';
     if (!TT.currencies().includes(cur)) cur = 'XAF';
     layout(); chatWidget();
-    if (TT.user) { const a = $('#acc'); a.title = TT.user.email; a.style.background = '#fff'; a.style.color = 'var(--pk-d)'; }
+    if (TT.user) { const a = $('#acc'); a.title = TT.user.email; a.style.background = '#fff'; a.style.color = 'var(--pk-d)';
+      const w = $('#walb'); w.classList.remove('hide'); $('#walv').textContent = TT.money(TT.user.balance || 0); w.title = t('wallet_title') + ': ' + TT.money(TT.user.balance || 0); }
     TT.i18n(); return TT;
   })();
   TT.requireLogin = () => { if (!TT.user) { location.href = '/account?next=' + encodeURIComponent(location.pathname + location.search); return false; } return true; };

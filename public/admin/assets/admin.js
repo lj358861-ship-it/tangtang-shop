@@ -25,7 +25,7 @@
   A.closeModal = () => $('#modal') && $('#modal').classList.remove('open');
 
   const NAV = [['index.html', '📊', 'Dashboard', 'Tableau de bord'], ['orders.html', '📦', 'Orders', 'Commandes'], ['payments.html', '💳', 'Payments', 'Paiements', 'pay'], ['messages.html', '💬', 'Messages', 'Messages', 'msg'],
-    ['products.html', '🛍️', 'Products', 'Produits'], ['countries.html', '🌍', 'Shipping rates', 'Tarifs & pays'], ['users.html', '👥', 'Customers', 'Clients'], ['settings.html', '⚙️', 'Settings', 'Réglages']];
+    ['products.html', '🛍️', 'Products', 'Produits'], ['countries.html', '🌍', 'Shipping rates', 'Tarifs & pays'], ['wallet.html', '💰', 'Wallet', 'Portefeuille'], ['users.html', '👥', 'Customers', 'Clients'], ['settings.html', '⚙️', 'Settings', 'Réglages']];
   A.shell = async (title) => {
     let me; try { me = (await A.api('/api/auth/me')).user; } catch { return null; }
     if (!me || me.role !== 'admin') { location.href = '/admin/login.html'; return null; }

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261018"><script src="/js/i18n.js?v=20261018"></script><script src="/js/app.js?v=20261018"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
 <main><div class="wrap" style="max-width:900px"><h1 style="font-size:30px" data-i18n="nav_orders"></h1><div id="app"><div class="skel" style="height:200px"></div></div></div></main>
 <script>
 TT.ready.then(async()=>{
@@ -6,7 +6,7 @@ TT.ready.then(async()=>{
   const os=await api('/api/orders');
   if(!os.length){$('#app').innerHTML=`<div class="box c"><p class="mu">${esc(t('no_orders'))}</p><a class="btn" href="/shop">${esc(t('hero_cta'))}</a></div>`;return}
   const pb=(s)=>({paid:['ok','pay_paid'],pending_review:['warn','pay_pending'],failed:['bad','pay_failed'],unpaid:['','pay_unpaid']}[s]||['',s]);
-  $('#app').innerHTML=os.map(o=>{const [k,l]=pb(o.payment_status);return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>#${o.code}</b> <span class="badge ${k}">${esc(t(l))}</span><div class="mu sm">${TT.date(o.created_at)} · ${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.mode==='air'?'✈️':'🚢'}</div></div><b class="price">${TT.fcfa(o.total)}</b></div>
+  $('#app').innerHTML=os.map(o=>{const [k,l]=pb(o.payment_status);return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>#${o.code}</b> <span class="badge ${k}">${esc(t(l))}</span>${o.escrow_state?` <span class="badge ${o.escrow_state==='held'?'warn':o.escrow_state==='released'?'ok':''}">🔒 ${esc(t('escrow_'+o.escrow_state))}</span>`:''}<div class="mu sm">${TT.date(o.created_at)} · ${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.mode==='air'?'✈️':'🚢'}</div></div><b class="price">${TT.fcfa(o.total)}</b></div>
    <div class="tl">${[0,1,2,3,4,5].map(i=>`<div class="${i<=o.status?'d':''}">${esc(t('st_'+i))}</div>`).join('')}</div>
    <div class="th">${o.items.slice(0,8).map(i=>`<img src="${i.image}" alt="">`).join('')}</div>
    <div class="gap">${o.payment_status==='unpaid'||o.payment_status==='failed'?`<a class="btn sm" href="/pay?order=${o.code}">💳 ${esc(t('pay_now'))}</a>`:''}<a class="btn alt sm" href="/order?code=${o.code}">${esc(t('details'))}</a></div></div>`}).join('');

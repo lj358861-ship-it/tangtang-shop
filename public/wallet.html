@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
+<main><div class="wrap" style="max-width:760px"><h1 style="font-size:30px">💰 <span data-i18n="wallet_title"></span></h1><div id="app"><div class="skel" style="height:240px"></div></div></div></main>
+<script>
+TT.ready.then(async()=>{
+  const {t,esc,api,$}=TT; if(!TT.requireLogin())return;
+  const w=await api('/api/wallet'); TT.user.balance=w.balance;
+  const need=+new URLSearchParams(location.search).get('need')||0;
+  const lab={topup:'wtx_topup',order_pay:'wtx_order_pay',release:'wtx_release',refund:'wtx_refund',adjust:'wtx_adjust'};
+  const st={submitted:['warn','pay_pending'],processing:['warn','pay_pending'],completed:['ok','pay_paid'],failed:['bad','pay_failed'],refused:['bad','pay_failed']};
+  const amt=(a)=>a===0?'—':(a>0?'+':'−')+TT.money(Math.abs(a));
+  $('#app').innerHTML=`<div class="balgrid"><div class="balcard main"><small>${esc(t('wallet_avail'))}</small><b>${TT.money(w.balance)}</b>${TT.cur()!=='XAF'?`<span>${TT.fcfa(w.balance)}</span>`:''}</div>
+    <div class="balcard"><small>🔒 ${esc(t('wallet_held'))}</small><b>${TT.money(w.held)}</b></div>
+    ${w.pendingTopups?`<div class="balcard"><small>⏳ ${esc(t('wallet_pending'))}</small><b>${TT.money(w.pendingTopups)}</b></div>`:''}</div>
+    <div class="box"><h3>➕ ${esc(t('wallet_topup'))}</h3>
+      <div class="chips" id="ch">${[50000,100000,200000,500000].map(v=>`<button class="chip2" data-v="${v}">${TT.money(v)}</button>`).join('')}</div>
+      <label>${esc(t('wallet_amount'))}</label><input id="am" type="number" inputmode="numeric" min="1000" step="1000" value="${need?Math.ceil(need/1000)*1000:''}" placeholder="100000">
+      <div class="mu sm" id="eq"></div><div id="er" class="alert bad hide"></div>
+      <button class="btn block ok" id="go" style="margin-top:12px">${esc(t('wallet_continue'))} →</button></div>
+    <div class="box"><h3>ℹ️ ${esc(t('wallet_how_t'))}</h3><ol class="how">${[1,2,3,4].map(i=>`<li>${esc(t('wallet_how'+i))}</li>`).join('')}</ol></div>
+    <div class="box"><h3>🧾 ${esc(t('wallet_history'))}</h3>${w.topups.filter(x=>x.status!=='completed').length?`<div class="tw"><table>${w.topups.filter(x=>x.status!=='completed').map(x=>`<tr><td>${TT.date(x.created_at)} ${TT.time(x.created_at)}</td><td>${esc(t('wtx_topup'))} · ${esc(x.mask||x.method)}</td><td class="r">${TT.money(x.amount)}</td><td><span class="badge ${st[x.status][0]}">${esc(t(st[x.status][1]))}</span></td></tr>`).join('')}</table></div>`:''}
+      ${w.tx.length?`<div class="tw"><table>${w.tx.map(x=>`<tr><td>${TT.date(x.created_at)} ${TT.time(x.created_at)}</td><td>${esc(t(lab[x.type]||x.type))}${x.code?` · <a href="/order?code=${x.code}">#${esc(x.code)}</a>`:''}</td><td class="r ${x.amount>0?'plus':x.amount<0?'minus':''}"><b>${amt(x.amount)}</b></td><td class="r mu sm">${TT.money(x.balance_after)}</td></tr>`).join('')}</table></div>`:`<div class="mu">${esc(t('wallet_empty'))}</div>`}</div>`;
+  const am=$('#am'),eq=()=>{const v=+am.value;$('#eq').textContent=v>0&&TT.cur()!=='XAF'?'≈ '+TT.money(v):''};am.oninput=eq;eq();
+  document.querySelectorAll('.chip2').forEach(b=>b.onclick=()=>{am.value=b.dataset.v;eq()});
+  $('#go').onclick=()=>{const v=Math.round(+am.value);if(!(v>=1000&&v<=10000000)){$('#er').textContent=t('err_topup_amount');$('#er').classList.remove('hide');return}location.href='/pay?topup='+v};
+});
+</script></body></html>

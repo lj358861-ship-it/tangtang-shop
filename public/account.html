@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261018"><script src="/js/i18n.js?v=20261018"></script><script src="/js/app.js?v=20261018"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
 <main><div class="wrap" style="max-width:520px"><div id="app"></div></div></main>
 <script>
 TT.ready.then(()=>{
@@ -8,20 +8,25 @@ TT.ready.then(()=>{
     const u=TT.user;
     $('#app').innerHTML=`<div class="box"><h2>👤 ${esc(u.name||u.email)}</h2><div class="mu">${esc(u.email)}${u.role==='admin'?' · <span class="badge">Admin</span>':''}</div>
     <label>${esc(t('f_name'))}</label><input id="n" value="${esc(u.name||'')}"><label>${esc(t('f_phone'))}</label><input id="p" value="${esc(u.phone||'')}">
-    <div class="gap" style="margin-top:12px"><button class="btn" id="sv">${esc(t('save'))}</button>${u.role==='admin'?'<a class="btn alt" href="/admin/">Admin portal</a>':''}<a class="btn alt" href="/orders">${esc(t('nav_orders'))}</a><button class="btn line" id="lo">${esc(t('logout'))}</button></div></div>
+    <h3 style="margin-top:18px">🌐 ${esc(t('pref_title'))}</h3><div class="g2"><div><label>${esc(t('pref_lang'))}</label><select id="pl">${TT.langOptions(TT.lang())}</select></div><div><label>${esc(t('pref_cur'))}</label><select id="pc2">${TT.curOptions(TT.cur())}</select></div></div>
+    <div class="gap" style="margin-top:12px"><button class="btn" id="sv">${esc(t('save'))}</button>${u.role==='admin'?'<a class="btn alt" href="/admin/">Admin portal</a>':''}<a class="btn alt" href="/orders">${esc(t('nav_orders'))}</a><a class="btn alt" href="/wallet">💰 ${esc(t('nav_wallet'))}</a><button class="btn line" id="lo">${esc(t('logout'))}</button></div></div>
     <div class="box"><h3>🔑 ${esc(t('pw_change'))}</h3><label>${esc(t('pw_current'))}</label><input id="c" type="password"><label>${esc(t('pw_new'))}</label><input id="nw" type="password"><div id="pe" class="alert bad hide"></div><button class="btn alt" id="pc" style="margin-top:10px">${esc(t('save'))}</button></div>`;
-    $('#sv').onclick=async()=>{await api('/api/auth/profile',{method:'PUT',body:{name:$('#n').value,phone:$('#p').value,lang:TT.lang()}});TT.toast('✓')};
+    $('#sv').onclick=async()=>{const nl=$('#pl').value,nc=$('#pc2').value;await api('/api/auth/profile',{method:'PUT',body:{name:$('#n').value,phone:$('#p').value,lang:nl,cur:nc}});
+      if(nl!==TT.lang()||nc!==TT.cur()){await TT.setPrefs({lang:nl,cur:nc})}else TT.toast('✓ '+t('pref_saved'))};
     $('#lo').onclick=async()=>{await api('/api/auth/logout',{method:'POST',body:{}});location.href='/'};
     $('#pc').onclick=async()=>{try{await api('/api/auth/password',{body:{current:$('#c').value,next:$('#nw').value}});TT.toast('✓');$('#c').value=$('#nw').value=''}catch(e){$('#pe').textContent=TT.errMsg(e);$('#pe').classList.remove('hide')}};
   }
   function inn(){
     $('#app').innerHTML=`<div class="box"><div class="seg"><button data-t="login" class="${tab==='login'?'on':''}">${esc(t('login'))}</button><button data-t="reg" class="${tab==='reg'?'on':''}">${esc(t('register'))}</button></div>
-    <form id="f">${tab==='reg'?`<label>${esc(t('f_name'))}</label><input id="n" required maxlength="80" autocomplete="name"><label>${esc(t('f_phone'))}</label><input id="p" type="tel" maxlength="30" autocomplete="tel">`:''}
+    <form id="f">${tab==='reg'?`<label>${esc(t('f_name'))}</label><input id="n" required maxlength="80" autocomplete="name"><label>${esc(t('f_phone'))}</label><input id="p" type="tel" maxlength="30" autocomplete="tel">
+    <div class="g2"><div><label>🌐 ${esc(t('pref_lang'))}</label><select id="pl">${TT.langOptions(TT.lang())}</select></div><div><label>💱 ${esc(t('pref_cur'))}</label><select id="pc2">${TT.curOptions(TT.cur())}</select></div></div>`:''}
     <label>${esc(t('email'))}</label><input id="e" type="email" required autocomplete="email"><label>${esc(t('password'))}</label><input id="pw" type="password" required minlength="6" autocomplete="${tab==='reg'?'new-password':'current-password'}">
     <div id="er" class="alert bad hide"></div><button class="btn block" style="margin-top:14px">${esc(tab==='reg'?t('register'):t('login'))}</button></form></div>`;
     document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;inn()});
     $('#f').onsubmit=async(ev)=>{ev.preventDefault();
-      try{const r=await api('/api/auth/'+(tab==='reg'?'register':'login'),{body:{email:$('#e').value,password:$('#pw').value,name:$('#n')?.value,phone:$('#p')?.value}});
+      try{const r=await api('/api/auth/'+(tab==='reg'?'register':'login'),{body:{email:$('#e').value,password:$('#pw').value,name:$('#n')?.value,phone:$('#p')?.value,lang:$('#pl')?.value,cur:$('#pc2')?.value}});
+        if(tab==='reg'){TT.LS.set('tt_lang',$('#pl').value);TT.LS.set('tt_cur',$('#pc2').value)}
+        else{try{sessionStorage.removeItem('tt_sync')}catch{}}
         location.href=r.role==='admin'&&next==='/'?'/admin/':safeNext}catch(e){$('#er').textContent=TT.errMsg(e);$('#er').classList.remove('hide')}};
   }
   TT.user?out():inn();

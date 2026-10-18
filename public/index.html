@@ -1,18 +1,19 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261018"><script src="/js/i18n.js?v=20261018"></script><script src="/js/app.js?v=20261018"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
 <main><div class="wrap">
 <section class="hero"><div><h1 data-i18n="hero_h"></h1><p data-i18n="hero_p"></p>
 <div class="gap" style="margin-top:16px"><a class="btn" href="/shop" data-i18n="hero_cta"></a><a class="btn line" href="/shipping" data-i18n="hero_cta2"></a></div>
 <div class="stats"><div><b id="s1">190+</b><span data-i18n="st_products"></span></div><div><b id="s2">45+</b><span data-i18n="st_countries"></span></div><div><b>50 000</b><span data-i18n="st_min"></span></div></div></div>
 <div class="mosaic" id="mos"></div></section>
 
-<div class="box" style="margin-top:18px"><div class="row top" style="flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3>📦 <span data-i18n="quota_title"></span></h3><div class="mu" data-i18n-html="quota_explain"></div></div>
-<div style="flex:1;min-width:240px" id="qdemo"></div></div></div>
-
 <div class="cats" id="cats"></div>
 
-<div class="sec" id="fl"><div class="row"><h2 data-i18n="flash"></h2><a class="btn alt sm" href="/shop?tab=promo" data-i18n="see_all"></a></div><div class="grid" id="g1"></div></div>
-<div class="sec" id="nw"><div class="row"><h2 data-i18n="new_arrivals"></h2><a class="btn alt sm" href="/shop?tab=new" data-i18n="see_all"></a></div><div class="grid" id="g3"></div></div>
-<div class="sec"><div class="row"><h2 data-i18n="hot"></h2><a class="btn alt sm" href="/shop?tab=hot" data-i18n="see_all"></a></div><div class="grid" id="g2"></div></div>
+<div class="sec" id="tr"><div class="row"><h2>🔥 <span data-i18n="car_t"></span></h2><a class="btn alt sm" href="/shop?tab=hot" data-i18n="see_all"></a></div>
+<div class="car" id="car"><div class="track hscroll" id="g2"></div><div class="dots" id="dots"></div></div></div>
+
+<a class="walban" href="/wallet"><span class="ico">💰</span><span><b data-i18n="wallet_topup"></b><small data-i18n="wallet_how2"></small></span><span class="go">→</span></a>
+
+<div class="sec" id="fl"><div class="row"><h2 data-i18n="flash"></h2><a class="btn alt sm" href="/shop?tab=promo" data-i18n="see_all"></a></div><div class="grid hscroll" id="g1"></div></div>
+<div class="sec" id="nw"><div class="row"><h2 data-i18n="new_arrivals"></h2><a class="btn alt sm" href="/shop?tab=new" data-i18n="see_all"></a></div><div class="grid hscroll" id="g3"></div></div>
 
 <div class="sec"><h2 data-i18n="how_t"></h2><div class="steps4">
 <div class="box"><div class="num">1</div><b data-i18n="how1_t"></b><div class="mu sm" data-i18n="how1"></div></div>
@@ -21,6 +22,9 @@
 <div class="box"><div class="num">4</div><b data-i18n="how4_t"></b><div class="mu sm" data-i18n="how4"></div></div></div></div>
 
 <div class="sec"><h2 data-i18n="ship_teaser"></h2><div class="box"><div id="cp"></div><div id="ms" style="margin:10px 0"></div><div id="est" class="mu"></div></div></div>
+
+<div class="box" style="margin-top:18px"><div class="row top" style="flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3>📦 <span data-i18n="quota_title"></span></h3><div class="mu" data-i18n-html="quota_explain"></div></div>
+<div style="flex:1;min-width:240px" id="qdemo"></div></div></div>
 </div></main>
 <script>
 TT.ready.then(async()=>{
@@ -32,7 +36,15 @@ TT.ready.then(async()=>{
   document.getElementById('g2').innerHTML=hot.items.map(TT.card).join('');
   document.getElementById('g3').innerHTML=nw.items.map(TT.card).join('');
   const feat=[...promo.items.slice(0,3),...hot.items.slice(0,3),...nw.items.slice(0,3)];
-  document.getElementById('mos').innerHTML=feat.map(p=>'<img loading="lazy" alt="" src="'+p.images[0]+'">').join('');
+  document.getElementById('mos').innerHTML=feat.map(p=>'<a href="/product?id='+p.id+'"><img alt="" src="'+p.images[0]+'"></a>').join('');
+  // trending carousel: swipe on a phone, arrows/auto-slide on desktop
+  const tr=document.getElementById('g2'), dots=document.getElementById('dots'); const slides=[...tr.children];
+  dots.innerHTML=slides.map((_,i)=>'<i data-i="'+i+'"></i>').join('');
+  const go=(i)=>{const el=slides[i]; if(el) tr.scrollTo({left:el.offsetLeft-tr.offsetLeft,behavior:'smooth'})};
+  let idx=0,timer=null;const play=()=>{clearInterval(timer);timer=setInterval(()=>{idx=(idx+1)%slides.length;go(idx)},3600)};
+  tr.addEventListener('scroll',()=>{const c=slides.findIndex(el=>el.offsetLeft-tr.offsetLeft+el.offsetWidth/2>tr.scrollLeft+tr.clientWidth*0.2);idx=Math.max(0,c);[...dots.children].forEach((d,i)=>d.classList.toggle('on',i===idx))},{passive:true});
+  ['touchstart','mousedown','wheel'].forEach(ev=>tr.addEventListener(ev,()=>{clearInterval(timer)},{passive:true}));['touchend','mouseleave'].forEach(ev=>tr.addEventListener(ev,play));
+  [...dots.children].forEach(d=>d.onclick=()=>{idx=+d.dataset.i;go(idx);play()}); if(slides.length>1)play();
   document.getElementById('cats').innerHTML=TT.cfg.categories.map(c=>'<a class="cat" href="/shop?cat='+c.key+'"><span>'+(TT.EMOJI[c.key]||'✨')+'</span>'+esc(TT.catName(c.key))+'</a>').join('');
   const min=TT.cfg.settings.min_order;
   document.getElementById('qdemo').innerHTML=TT.quotaHTML({quota:60,ok:false,missing:min*.4,minOrder:min});

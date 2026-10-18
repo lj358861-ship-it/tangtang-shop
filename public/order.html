@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261018"><script src="/js/i18n.js?v=20261018"></script><script src="/js/app.js?v=20261018"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
 <main><div class="wrap"><div id="app"><div class="skel" style="height:300px"></div></div></div></main>
 <script>
 TT.ready.then(async()=>{
@@ -7,7 +7,7 @@ TT.ready.then(async()=>{
   try{o=await api('/api/orders/'+encodeURIComponent(code))}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return}
   const pb={paid:['ok','pay_paid'],pending_review:['warn','pay_pending'],failed:['bad','pay_failed'],unpaid:['','pay_unpaid']}[o.payment_status]||['',o.payment_status];
   $('#app').innerHTML=`<div class="pd pd2"><div>
-    <div class="box"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0">#${o.code}</h2><span class="badge ${pb[0]}">${esc(t(pb[1]))}</span></div>
+    <div class="box"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0">#${o.code}</h2><span class="badge ${pb[0]}">${esc(t(pb[1]))}</span>${o.escrow_state?` <span class="badge ${o.escrow_state==='held'?'warn':o.escrow_state==='released'?'ok':''}">🔒 ${esc(t('escrow_'+o.escrow_state))}</span>`:''}</div>
     <div class="mu sm">${TT.date(o.created_at)} · ${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.mode==='air'?'✈️ '+esc(t('air')):'🚢 '+esc(t('sea'))}</div>
     <div class="tl" style="margin-top:14px">${[0,1,2,3,4,5].map(i=>`<div class="${i<=o.status?'d':''}">${esc(t('st_'+i))}</div>`).join('')}</div></div>
     <div class="box"><h3>${esc(t('items'))}</h3>${o.items.map(i=>`<div class="li" style="margin:8px 0"><img src="${i.image}" alt=""><div><b>${esc(i.name[TT.lang()]||i.name.en)}</b><div class="mu sm">${esc(i.variant||'')} ${esc(i.size==='ONE'?t('one_size'):i.size||'')}</div><div class="sm">${TT.fcfa(i.unit_price)} × ${i.qty}</div></div><b>${TT.fcfa(i.unit_price*i.qty)}</b></div>`).join('')}</div>

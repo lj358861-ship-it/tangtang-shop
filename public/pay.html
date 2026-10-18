@@ -1,15 +1,17 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261018"><script src="/js/i18n.js?v=20261018"></script><script src="/js/app.js?v=20261018"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
 <main><div class="wrap" style="max-width:900px"><h1 style="font-size:30px" data-i18n="pay_title"></h1><div id="app"><div class="skel" style="height:300px"></div></div></div></main>
 <script>
 TT.ready.then(async()=>{
   const {t,esc,api,$}=TT; if(!TT.requireLogin())return;
-  const code=new URLSearchParams(location.search).get('order'); let o;
-  try{o=await api('/api/orders/'+encodeURIComponent(code))}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return}
+  const qs=new URLSearchParams(location.search), code=qs.get('order'), topup=Math.round(+qs.get('topup')||0); let o, bal=0;
+  if(topup){ if(!(topup>=1000&&topup<=10000000)){location.href='/wallet';return} o={code:'',total:topup,payment_status:'unpaid',payments:[],qty_total:0,country:'',topup:true}; document.querySelector('h1').textContent='💰 '+t('topup_title',{a:TT.money(topup)}); }
+  else { try{o=await api('/api/orders/'+encodeURIComponent(code)); bal=(await api('/api/wallet')).balance}catch(e){$('#app').innerHTML='<div class="alert bad">'+esc(t('err_not_found'))+'</div>';return} }
   let method=null;
   const LG=(f,c='')=>`<img class="pl ${c}" src="/img/brand/${f}.png" alt="" loading="lazy">`;
-  const M=[['card',LG('visa','v')+LG('mc-mark','m'),t('m_card'),'#1a1f71'],['mtn',LG('mtn'),t('m_mtn'),'#ffcc00'],['orange',LG('orange'),t('m_orange'),'#ff7900'],['airtel',LG('airtel'),t('m_airtel'),'#e40000'],['other','<span class="plus">+</span>',t('m_other'),'#14a671']];
+  const M=[...(topup?[]:[['wallet','<span class="plus">💰</span>',t('m_wallet'),'#ff4f78']]),['card',LG('visa','v')+LG('mc-mark','m'),t('m_card'),'#1a1f71'],['mtn',LG('mtn'),t('m_mtn'),'#ffcc00'],['orange',LG('orange'),t('m_orange'),'#ff7900'],['airtel',LG('airtel'),t('m_airtel'),'#e40000'],['other','<span class="plus">+</span>',t('m_other'),'#14a671']];
   const statusBadge=(s)=>({paid:['ok',t('pay_paid')],pending_review:['warn',t('pay_pending')],failed:['bad',t('pay_failed')],unpaid:['',t('pay_unpaid')]}[s]||['',s]);
-  function head(){const [k,l]=statusBadge(o.payment_status);return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>#${esc(o.code)}</b> <span class="badge ${k}">${esc(l)}</span><div class="mu sm">${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.qty_total} ${esc(t('items'))}</div></div>
+  function head(){if(o.topup)return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>💰 ${esc(t('wallet_topup'))}</b><div class="mu sm">${esc(t('wallet_how2'))}</div></div><div class="c"><div class="mu sm">${esc(t('amount_due'))}</div><div class="price" style="font-size:28px">${TT.fcfa(o.total)}</div>${TT.cur()!=='XAF'?`<div class="mu sm">≈ ${TT.money(o.total)}</div>`:''}</div></div></div>`;
+    const [k,l]=statusBadge(o.payment_status);return `<div class="box"><div class="row" style="flex-wrap:wrap"><div><b>#${esc(o.code)}</b> <span class="badge ${k}">${esc(l)}</span><div class="mu sm">${TT.flag(o.country)} ${esc(TT.countryName(o.country))} · ${o.qty_total} ${esc(t('items'))}</div></div>
       <div class="c"><div class="mu sm">${esc(t('amount_due'))}</div><div class="price" style="font-size:28px">${TT.fcfa(o.total)}</div>${TT.cur()!=='XAF'?`<div class="mu sm">≈ ${TT.money(o.total)}</div>`:''}</div></div></div>`}
   function history(){return o.payments.length?`<div class="box"><b>${esc(t('pay_history'))}</b><div class="tw"><table><tr><th>${esc(t('date'))}</th><th>${esc(t('method'))}</th><th></th><th>${esc(t('status'))}</th></tr>${o.payments.map(p=>`<tr><td>${TT.date(p.created_at)} ${TT.time(p.created_at)}</td><td>${esc(M.find(m=>m[0]===p.method)?.[2]||p.method)}</td><td>${esc(p.mask||'')}</td><td><span class="badge ${p.status==='completed'?'ok':p.status==='failed'||p.status==='refused'?'bad':'warn'}">${esc(t('ps_'+p.status))}</span></td></tr>`).join('')}</table></div></div>`:''}
   function draw(){
@@ -22,6 +24,18 @@ TT.ready.then(async()=>{
   const NOTICE=()=>`<div class="notice">🔒 ${esc(t('pay_disclosure'))}${TT.cfg.settings.pay_notice?'<br>'+esc(TT.cfg.settings.pay_notice):''}</div>`;
   function form(){
     const f=$('#form'); let h='';
+    if(method==='wallet'){
+      const enough=bal>=o.total;
+      f.innerHTML=`<div class="box"><h3>💰 ${esc(t('m_wallet'))} — ${TT.fcfa(o.total)}</h3>
+        <div class="alert ${enough?'ok':''}">${esc(enough?t('wallet_enough',{b:TT.money(bal)}):t('wallet_short',{b:TT.money(bal),m:TT.money(o.total-bal)}))}</div>
+        <div id="err" class="alert bad hide"></div>
+        ${enough?`<button class="btn block ok" id="wsend">${esc(t('wallet_pay_btn'))} ${TT.fcfa(o.total)}</button>`:`<a class="btn block ok" href="/wallet?need=${o.total-bal}">➕ ${esc(t('wallet_topup_cta',{m:TT.money(o.total-bal)}))}</a>`}</div>`;
+      const b=f.querySelector('#wsend');
+      if(b)b.onclick=async()=>{b.disabled=true;try{const r=await api('/api/orders/'+encodeURIComponent(o.code)+'/pay-wallet',{body:{}});TT.user.balance=r.balance;
+        $('#app').innerHTML=`<div class="box c"><p style="font-size:54px;margin:0">✅</p><h2>${esc(t('wallet_paid_t'))}</h2><p class="mu">${esc(t('wallet_paid_p'))}</p><p><b>#${esc(o.code)}</b></p><div class="gap" style="justify-content:center"><a class="btn" href="/orders">${esc(t('nav_orders'))}</a><a class="btn alt" href="/wallet">💰 ${esc(t('nav_wallet'))}</a></div></div>`;
+      }catch(x){const er=f.querySelector('#err');er.textContent=TT.errMsg(x);er.classList.remove('hide');b.disabled=false}};
+      return;
+    }
     if(method==='card'){
       h=`<div class="cardprev" id="cp"><img class="cb" id="cb" alt=""><small>${esc(t('card_number'))}</small><div class="n" id="pn">•••• •••• •••• ••••</div><div class="row"><div><small>${esc(t('card_holder'))}</small><div id="ph">—</div></div><div><small>MM/YY</small><div id="pe">••/••</div></div></div><div class="chip"></div></div>
       <label>${esc(t('card_holder'))}</label><input id="name" autocomplete="cc-name" value="${esc(TT.user.name||'')}">
@@ -61,7 +75,8 @@ TT.ready.then(async()=>{
         const file=$$('#proof').files[0]; if(file){if(file.size>4e6){er.textContent=t('err_proof_too_big');er.classList.remove('hide');return}data.proof=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(file)})}}
       else Object.assign(data,{phone:$$('#phone').value,pin:$$('#pin').value});
       $$('#send').disabled=true;
-      try{await api('/api/orders/'+encodeURIComponent(o.code)+'/pay',{body:{method,data}});
+      try{await (o.topup?api('/api/wallet/topup',{body:{amount:o.total,method,data}}):api('/api/orders/'+encodeURIComponent(o.code)+'/pay',{body:{method,data}}));
+        if(o.topup){$('#app').innerHTML=`<div class="box c"><p style="font-size:54px;margin:0">✅</p><h2>${esc(t('topup_sent_t'))}</h2><p class="mu">${esc(t('topup_sent_p'))}</p><p><b>${TT.fcfa(o.total)}</b></p><div class="gap" style="justify-content:center"><a class="btn" href="/wallet">💰 ${esc(t('nav_wallet'))}</a><a class="btn alt" href="/chat">💬 ${esc(t('chat_btn'))}</a></div></div>`;return}
         $('#app').innerHTML=`<div class="box c"><p style="font-size:54px;margin:0">✅</p><h2>${esc(t('pay_sent_t'))}</h2><p class="mu">${esc(t('pay_sent_p'))}</p><p><b>#${esc(o.code)}</b></p><div class="gap" style="justify-content:center"><a class="btn" href="/orders">${esc(t('nav_orders'))}</a><a class="btn alt" href="/chat">💬 ${esc(t('chat_btn'))}</a></div></div>`;
       }catch(x){er.textContent=TT.errMsg(x);er.classList.remove('hide');$$('#send').disabled=false}
     };

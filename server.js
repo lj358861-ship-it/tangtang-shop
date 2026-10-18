@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const D = require('./lib/db');
-const { run, get, all, tx, now, encrypt, decrypt, hashPw, checkPw, setting, setSetting } = D;
+const { run, get, all, tx, now, encrypt, decrypt, hashPw, checkPw, setting, setSetting, walletMove } = D;
 let sharp = null; try { sharp = require('sharp'); } catch (e) { console.warn('sharp not available: product image upload will store originals'); }
 
 const app = express();
@@ -43,7 +43,7 @@ function cookie(req, name) { const m = (req.headers.cookie || '').split(';').map
 app.use((req, res, next) => {
   const t = cookie(req, COOKIE); req.user = null;
   if (t) {
-    const r = get('SELECT u.id,u.email,u.name,u.phone,u.role,u.lang FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?', sha(t), now());
+    const r = get('SELECT u.id,u.email,u.name,u.phone,u.role,u.lang,u.cur,u.balance FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?', sha(t), now());
     if (r) req.user = { ...r };
   }
   next();
@@ -52,13 +52,16 @@ const needUser = (req, res, next) => req.user ? next() : err(res, 401, 'login_re
 const needAdmin = (req, res, next) => req.user && req.user.role === 'admin' ? next() : err(res, req.user ? 403 : 401, 'admin_required');
 const audit = (uid, action, target) => run('INSERT INTO audit(user_id,action,target,created_at) VALUES(?,?,?,?)', uid, action, String(target || ''), now());
 
+const LANG_OK = ['fr', 'en', 'de', 'es', 'zh'];
+const cleanLang = (v) => LANG_OK.includes(v) ? v : null;
+const cleanCur = (v) => { v = String(v || '').toUpperCase(); return /^[A-Z]{3}$/.test(v) && (v === 'XAF' || (setting('fx') || {})[v]) ? v : null; };
 app.post('/api/auth/register', limit('reg', 10, 3600), wrap((req, res) => {
-  const { email, password, name, phone } = req.body || {};
+  const { email, password, name, phone, lang, cur } = req.body || {};
   const e = String(email || '').trim().toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(e)) return err(res, 400, 'invalid_email');
   if (String(password || '').length < 6) return err(res, 400, 'password_short');
   if (get('SELECT 1 FROM users WHERE email=?', e)) return err(res, 409, 'email_taken');
-  const r = run('INSERT INTO users(email,name,phone,pass_hash,created_at) VALUES(?,?,?,?,?)', e, String(name || '').slice(0, 80), String(phone || '').slice(0, 30), hashPw(password), now());
+  const r = run('INSERT INTO users(email,name,phone,pass_hash,lang,cur,created_at) VALUES(?,?,?,?,?,?,?)', e, String(name || '').slice(0, 80), String(phone || '').slice(0, 30), hashPw(password), cleanLang(lang), cleanCur(cur), now());
   startSession(res, Number(r.lastInsertRowid));
   res.json({ ok: true });
 }));
@@ -67,7 +70,7 @@ app.post('/api/auth/login', limit('login', 15, 900), wrap((req, res) => {
   const u = get('SELECT * FROM users WHERE email=?', e);
   if (!u || !checkPw(String(req.body?.password || ''), u.pass_hash)) return err(res, 401, 'bad_credentials');
   startSession(res, u.id);
-  res.json({ ok: true, role: u.role });
+  res.json({ ok: true, role: u.role, lang: u.lang, cur: u.cur });
 }));
 app.post('/api/auth/logout', wrap((req, res) => {
   const t = cookie(req, COOKIE); if (t) run('DELETE FROM sessions WHERE token_hash=?', sha(t));
@@ -75,8 +78,12 @@ app.post('/api/auth/logout', wrap((req, res) => {
 }));
 app.get('/api/auth/me', (req, res) => res.json({ user: req.user }));
 app.put('/api/auth/profile', needUser, wrap((req, res) => {
-  const { name, phone, lang } = req.body || {};
-  run('UPDATE users SET name=?, phone=?, lang=? WHERE id=?', String(name || '').slice(0, 80), String(phone || '').slice(0, 30), String(lang || '').slice(0, 5), req.user.id);
+  const { name, phone, lang, cur } = req.body || {};
+  run('UPDATE users SET name=?, phone=?, lang=COALESCE(?,lang), cur=COALESCE(?,cur) WHERE id=?', String(name || '').slice(0, 80), String(phone || '').slice(0, 30), cleanLang(lang), cleanCur(cur), req.user.id);
+  res.json({ ok: true });
+}));
+app.put('/api/auth/prefs', needUser, wrap((req, res) => {
+  run('UPDATE users SET lang=COALESCE(?,lang), cur=COALESCE(?,cur) WHERE id=?', cleanLang(req.body?.lang), cleanCur(req.body?.cur), req.user.id);
   res.json({ ok: true });
 }));
 app.post('/api/auth/password', needUser, limit('pw', 10, 900), wrap((req, res) => {
@@ -206,9 +213,8 @@ app.get('/api/orders/:code', needUser, wrap((req, res) => {
 // ---------- payments ----------
 const luhn = (n) => { let s = 0, d = false; for (let i = n.length - 1; i >= 0; i--) { let x = +n[i]; if (d) { x *= 2; if (x > 9) x -= 9; } s += x; d = !d; } return s % 10 === 0; };
 const METHODS = ['card', 'mtn', 'orange', 'airtel', 'other'];
-app.post('/api/orders/:code/pay', needUser, limit('pay', 12, 3600), wrap(async (req, res) => {
-  const o = myOrder(req, res); if (!o) return;
-  if (o.payment_status === 'paid') return err(res, 400, 'already_paid');
+// collects the payer's details for an order payment OR a wallet top-up (o.id === null); admin then processes it manually
+async function collectPayment(req, res, o, kind) {
   const { method, data = {} } = req.body || {};
   if (!METHODS.includes(method)) return err(res, 400, 'bad_method');
   const digits = (s) => String(s || '').replace(/\D/g, '');
@@ -238,12 +244,52 @@ app.post('/api/orders/:code/pay', needUser, limit('pay', 12, 3600), wrap(async (
     if (pin.length < 4 || pin.length > 6) return err(res, 400, 'pin_invalid');
     payer_phone = num; secret = { pin }; mask = '••• ' + num.slice(-3);
   }
-  const r = run(`INSERT INTO payments(order_id,user_id,method,amount,status,payer_name,payer_phone,mask,enc,extra,proof_file,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, o.id, req.user.id, method, o.total, 'submitted', payer_name, payer_phone, mask,
-    Object.keys(secret).length ? encrypt(secret) : null, JSON.stringify(extra), proof, now());
-  run("UPDATE orders SET payment_status='pending_review' WHERE id=?", o.id);
-  pushAdmin({ type: 'payment', code: o.code, method });
+  const r = run(`INSERT INTO payments(order_id,user_id,method,amount,status,payer_name,payer_phone,mask,enc,extra,proof_file,created_at,kind)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, o.id, req.user.id, method, o.total, 'submitted', payer_name, payer_phone, mask,
+    Object.keys(secret).length ? encrypt(secret) : null, JSON.stringify(extra), proof, now(), kind);
+  if (o.id) run("UPDATE orders SET payment_status='pending_review' WHERE id=?", o.id);
+  pushAdmin({ type: 'payment', code: o.code || 'TOPUP', method });
   res.json({ ok: true, id: Number(r.lastInsertRowid) });
+}
+app.post('/api/orders/:code/pay', needUser, limit('pay', 12, 3600), wrap(async (req, res) => {
+  const o = myOrder(req, res); if (!o) return;
+  if (o.payment_status === 'paid') return err(res, 400, 'already_paid');
+  if (o.status === 6) return err(res, 400, 'order_cancelled');
+  return collectPayment(req, res, o, 'order');
+}));
+
+// ---------- wallet: the customer tops up a balance, orders are debited from it right away ----------
+app.get('/api/wallet', needUser, wrap((req, res) => {
+  const u = get('SELECT balance FROM users WHERE id=?', req.user.id);
+  res.json({
+    balance: u.balance,
+    held: get("SELECT COALESCE(SUM(escrow),0) n FROM orders WHERE user_id=? AND escrow_state='held'", req.user.id).n,
+    pendingTopups: get("SELECT COALESCE(SUM(amount),0) n FROM payments WHERE user_id=? AND kind='topup' AND status IN ('submitted','processing')", req.user.id).n,
+    tx: all(`SELECT w.id,w.type,w.amount,w.balance_after,w.note,w.created_at,o.code FROM wallet_tx w LEFT JOIN orders o ON o.id=w.order_id WHERE w.user_id=? ORDER BY w.id DESC LIMIT 100`, req.user.id),
+    topups: all("SELECT id,method,amount,status,mask,created_at FROM payments WHERE user_id=? AND kind='topup' ORDER BY id DESC LIMIT 20", req.user.id),
+  });
+}));
+app.post('/api/wallet/topup', needUser, limit('topup', 12, 3600), wrap(async (req, res) => {
+  const amount = Math.round(+req.body?.amount);
+  if (!(amount >= 1000 && amount <= 10000000)) return err(res, 400, 'topup_amount');
+  if (req.body?.method === 'wallet') return err(res, 400, 'bad_method');
+  return collectPayment(req, res, { id: null, code: null, total: amount }, 'topup');
+}));
+app.post('/api/orders/:code/pay-wallet', needUser, limit('paywallet', 30, 3600), wrap((req, res) => {
+  const o = myOrder(req, res); if (!o) return;
+  if (o.user_id !== req.user.id) return err(res, 403, 'forbidden');
+  try {
+    tx(() => {
+      const f = get('SELECT * FROM orders WHERE id=?', o.id);
+      if (f.payment_status === 'paid') throw Object.assign(new Error('already_paid'), { status: 400 });
+      if (f.status === 6) throw Object.assign(new Error('order_cancelled'), { status: 400 });
+      walletMove(req.user.id, 'order_pay', -f.total, { orderId: f.id, note: f.code });      // client is debited immediately…
+      run("UPDATE orders SET payment_status='paid', status=MAX(status,1), escrow=?, escrow_state='held' WHERE id=?", f.total, f.id);   // …funds stay held until delivery
+      run("UPDATE payments SET status='refused', admin_note='Paid with balance', processed_at=?, enc=NULL, purged=1 WHERE order_id=? AND status IN ('submitted','processing')", now(), f.id);
+    });
+  } catch (e) { return err(res, e.status || 500, e.message); }
+  pushAdmin({ type: 'order_paid', code: o.code });
+  res.json({ ok: true, balance: get('SELECT balance FROM users WHERE id=?', req.user.id).balance });
 }));
 app.get('/api/proof/:file', needUser, wrap((req, res) => {
   const f = path.basename(req.params.file);
@@ -297,6 +343,8 @@ A.get('/stats', wrap((req, res) => {
     byStatus: all('SELECT status, COUNT(*) n FROM orders GROUP BY status'),
     last7: all("SELECT date(created_at,'unixepoch') d, COUNT(*) n, SUM(total) t FROM orders WHERE created_at>? GROUP BY d ORDER BY d", now() - 7 * 86400),
     recent: all('SELECT code,name,country,total,status,payment_status,created_at FROM orders ORDER BY id DESC LIMIT 8'),
+    balances: get("SELECT COALESCE(SUM(balance),0) n FROM users WHERE role='customer'").n,
+    held: get("SELECT COALESCE(SUM(escrow),0) n FROM orders WHERE escrow_state='held'").n,
   });
 }));
 A.get('/orders', wrap((req, res) => {
@@ -310,15 +358,27 @@ A.get('/orders', wrap((req, res) => {
 A.patch('/orders/:code', wrap((req, res) => {
   const o = get('SELECT * FROM orders WHERE code=?', req.params.code); if (!o) return err(res, 404, 'not_found');
   const { status, payment_status, admin_note } = req.body || {};
-  if (status !== undefined) { if (!(status >= 0 && status <= 6)) return err(res, 400, 'bad_status'); run('UPDATE orders SET status=? WHERE id=?', status, o.id); }
+  if (status !== undefined) {
+    if (!(status >= 0 && status <= 6)) return err(res, 400, 'bad_status');
+    tx(() => {
+      run('UPDATE orders SET status=? WHERE id=?', status, o.id);
+      if (o.escrow_state === 'held' && status === 5) {            // delivered → the held amount is definitively debited from the customer's wallet account
+        run("UPDATE orders SET escrow_state='released' WHERE id=?", o.id);
+        walletMove(o.user_id, 'release', 0, { orderId: o.id, note: 'Delivered: ' + o.escrow + ' FCFA released' });
+      } else if (o.escrow_state === 'held' && status === 6) {     // cancelled → refund to the customer's balance
+        run("UPDATE orders SET escrow_state='refunded', payment_status='unpaid' WHERE id=?", o.id);
+        walletMove(o.user_id, 'refund', o.escrow, { orderId: o.id, note: o.code });
+      }
+    });
+  }
   if (payment_status !== undefined) { if (!['unpaid', 'pending_review', 'paid', 'failed'].includes(payment_status)) return err(res, 400, 'bad'); run('UPDATE orders SET payment_status=? WHERE id=?', payment_status, o.id); }
   if (admin_note !== undefined) run('UPDATE orders SET admin_note=? WHERE id=?', String(admin_note).slice(0, 1000), o.id);
   audit(req.user.id, 'order.update', o.code); res.json({ ok: true });
 }));
 A.get('/payments', wrap((req, res) => {
   const w = [], a = []; if (req.query.status) { w.push('p.status=?'); a.push(req.query.status); }
-  res.json(all(`SELECT p.id,p.order_id,p.method,p.amount,p.status,p.payer_name,p.payer_phone,p.mask,p.extra,p.proof_file,p.admin_note,p.created_at,p.processed_at,p.purged,o.code,o.country,u.email,
-    (p.enc IS NOT NULL) has_secret FROM payments p JOIN orders o ON o.id=p.order_id LEFT JOIN users u ON u.id=p.user_id ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY p.id DESC LIMIT 300`, ...a)
+  res.json(all(`SELECT p.id,p.order_id,p.kind,p.method,p.amount,p.status,p.payer_name,p.payer_phone,p.mask,p.extra,p.proof_file,p.admin_note,p.created_at,p.processed_at,p.purged,o.code,o.country,u.email,
+    (p.enc IS NOT NULL) has_secret FROM payments p LEFT JOIN orders o ON o.id=p.order_id LEFT JOIN users u ON u.id=p.user_id ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY p.id DESC LIMIT 300`, ...a)
     .map(p => ({ ...p, extra: J(p.extra, {}) })));
 }));
 A.post('/payments/:id/reveal', limit('reveal', 60, 600), wrap((req, res) => {
@@ -331,10 +391,12 @@ A.patch('/payments/:id', wrap((req, res) => {
   const { status, admin_note } = req.body || {};
   if (!['submitted', 'processing', 'completed', 'failed', 'refused'].includes(status)) return err(res, 400, 'bad_status');
   const done = ['completed', 'failed', 'refused'].includes(status);
+  if (p.kind === 'topup' && p.status === 'completed') return err(res, 400, 'locked');   // already credited to the wallet
   tx(() => {
     run('UPDATE payments SET status=?, admin_note=COALESCE(?,admin_note), processed_at=?, processed_by=? WHERE id=?', status, admin_note ?? null, done ? now() : null, req.user.id, p.id);
     if (done) run('UPDATE payments SET enc=NULL, purged=1 WHERE id=?', p.id);          // wipe PIN / CVV / full card number once handled
-    if (status === 'completed') run("UPDATE orders SET payment_status='paid', status=MAX(status,1) WHERE id=?", p.order_id);
+    if (p.kind === 'topup') { if (status === 'completed') walletMove(p.user_id, 'topup', p.amount, { paymentId: p.id, note: p.method }); }
+    else if (status === 'completed') run("UPDATE orders SET payment_status='paid', status=MAX(status,1) WHERE id=?", p.order_id);
     else if (done) run("UPDATE orders SET payment_status=CASE WHEN EXISTS(SELECT 1 FROM payments WHERE order_id=? AND status IN ('submitted','processing') AND id<>?) THEN 'pending_review' ELSE 'failed' END WHERE id=?", p.order_id, p.id, p.order_id);
   });
   audit(req.user.id, 'payment.' + status, p.id); res.json({ ok: true });
@@ -405,7 +467,20 @@ A.put('/settings', wrap((req, res) => {
   for (const k of ['shop_name', 'support_email', 'support_whatsapp', 'pay_notice']) if (b[k] !== undefined) setSetting(k, String(b[k]).slice(0, 500));
   audit(req.user.id, 'settings.update', ''); res.json({ ok: true });
 }));
-A.get('/users', wrap((req, res) => res.json(all(`SELECT u.id,u.email,u.name,u.phone,u.role,u.created_at,(SELECT COUNT(*) FROM orders WHERE user_id=u.id) orders FROM users u ORDER BY u.id DESC LIMIT 500`))));
+A.get('/users', wrap((req, res) => res.json(all(`SELECT u.id,u.email,u.name,u.phone,u.role,u.created_at,u.balance,u.lang,u.cur,(SELECT COUNT(*) FROM orders WHERE user_id=u.id) orders FROM users u ORDER BY u.id DESC LIMIT 500`))));
+A.post('/users/:id/balance', limit('adj', 60, 600), wrap((req, res) => {
+  const uid = +req.params.id, delta = Math.round(+req.body?.delta), note = String(req.body?.note || '').slice(0, 150);
+  if (!get('SELECT 1 FROM users WHERE id=?', uid) || !delta || Math.abs(delta) > 50000000) return err(res, 400, 'bad');
+  try { const b = tx(() => walletMove(uid, 'adjust', delta, { note: note || 'Admin adjustment' })); audit(req.user.id, 'wallet.adjust', uid + ':' + delta); res.json({ ok: true, balance: b }); }
+  catch (e) { err(res, e.status || 500, e.message); }
+}));
+A.get('/wallet', wrap((req, res) => res.json({
+  balances: get("SELECT COALESCE(SUM(balance),0) n FROM users WHERE role='customer'").n,
+  held: get("SELECT COALESCE(SUM(escrow),0) n FROM orders WHERE escrow_state='held'").n,
+  released: get("SELECT COALESCE(SUM(escrow),0) n FROM orders WHERE escrow_state='released'").n,
+  heldOrders: all("SELECT o.code,o.name,o.escrow,o.status,o.created_at,u.email FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE o.escrow_state='held' ORDER BY o.id DESC LIMIT 200"),
+  tx: all('SELECT w.id,w.type,w.amount,w.balance_after,w.note,w.created_at,u.email,o.code FROM wallet_tx w JOIN users u ON u.id=w.user_id LEFT JOIN orders o ON o.id=w.order_id ORDER BY w.id DESC LIMIT 200'),
+})));
 A.get('/audit', wrap((req, res) => res.json(all('SELECT a.*, u.email FROM audit a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 200'))));
 
 // ---------- pages & static ----------
