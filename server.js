@@ -416,8 +416,12 @@ app.use('/admin', (req, res, next) => {
   res.redirect('/admin/login.html');
 });
 app.use('/img/u', express.static(path.join(D.DATA_DIR, 'uploads'), { maxAge: '30d', immutable: true }));
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], maxAge: PROD ? '1h' : 0,
-  setHeaders: (res, p) => { if (p.includes(path.join('public', 'img', 'p'))) res.set('Cache-Control', 'public, max-age=2592000, immutable'); } }));
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], maxAge: 0,
+  setHeaders: (res, p) => {
+    if (p.includes(path.join('public', 'img', 'p'))) res.set('Cache-Control', 'public, max-age=2592000, immutable');
+    else if (/\.(png|jpe?g|webp|svg|ico|woff2?)$/i.test(p)) res.set('Cache-Control', 'public, max-age=86400');
+    else res.set('Cache-Control', 'no-cache'); // html/js/css: always revalidate (ETag) so updates show instantly
+  } }));
 app.use((req, res) => req.path.startsWith('/api/') ? err(res, 404, 'not_found') : res.status(404).sendFile(path.join(__dirname, 'public', '404.html')));
 app.use((e, req, res, next) => { console.error(e); if (res.headersSent) return; err(res, 500, 'server_error'); });
 
