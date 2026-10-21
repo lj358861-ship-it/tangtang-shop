@@ -1,11 +1,11 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261019"><script src="/js/i18n.js?v=20261019"></script><script src="/js/app.js?v=20261019"></script></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ff4f78"><title>Tangtang 糖糖</title><link rel="icon" type="image/png" href="/img/brand/favicon.png"><link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png"><link rel="stylesheet" href="/css/site.css?v=20261020"><script src="/js/i18n.js?v=20261020"></script><script src="/js/app.js?v=20261020"></script></head><body>
 <main><div class="wrap"><div id="pd"><div class="skel" style="height:420px"></div></div></div></main>
 <script>
 TT.ready.then(async()=>{
   const {t,esc,api,$}=TT; const id=new URLSearchParams(location.search).get('id'); let p;
   try{p=await api('/api/products/'+encodeURIComponent(id))}catch(e){$('#pd').innerHTML='<p>'+esc(t('empty'))+'</p>';return}
   document.title=TT.pname(p)+' · Tangtang';
-  let vi=0, qty=p.moq; const sizes=p.sizes.map(s=>s==='ONE'?t('one_size'):s);
+  let vi=0, qty=p.moq; const sizes=(p.sizes||[]).map(s=>s==='ONE'?t('one_size'):s);
   const draw=()=>{
     const vn=p.variants[vi];
     $('#pd').innerHTML=`<div class="pd"><div><img class="main" src="${p.images[vi]}" alt=""><div class="th">${p.images.map((x,j)=>`<img class="${j===vi?'on':''}" data-j="${j}" src="${x}" alt="">`).join('')}</div></div>
@@ -15,7 +15,7 @@ TT.ready.then(async()=>{
     <div class="mu sm">${esc(t('per_unit'))} · ${esc(t('moq'))}: <b>${p.moq}</b> · ${p.kg} kg ${p.sold?` · 🔥 ${p.sold}+ ${esc(t('sold'))}`:''}</div>
     <div class="box"><b>${esc(t('desc'))}</b><p style="margin:6px 0">${esc(TT.pdesc(p))}</p>
       ${vn?`<div class="sm"><b>${esc(t('design'))}:</b> ${esc(vn)}</div>`:p.images.length>1?`<div class="sm mu">${esc(t('design'))}: #${vi+1}/${p.images.length}</div>`:''}
-      ${p.colors[TT.lang()]?`<div class="sm"><b>${esc(t('colors'))}:</b> ${esc(p.colors[TT.lang()]||p.colors.en)}</div>`:''}
+      ${(p.colors||{})[TT.lang()]?`<div class="sm"><b>${esc(t('colors'))}:</b> ${esc((p.colors||{})[TT.lang()]||(p.colors||{}).en)}</div>`:''}
       ${sizes.length?`<label>${esc(t('size'))}</label><select id="sz">${sizes.map((s,i)=>`<option value="${esc(p.sizes[i])}">${esc(s)}</option>`).join('')}</select>`:''}
       <label>${esc(t('qty'))}</label><div class="qty"><button id="mn">−</button><input id="q" type="number" min="${p.moq}" value="${qty}"><button id="pl">+</button></div>
       <div class="row" style="margin-top:12px;gap:8px"><button class="btn block" id="add">🛒 ${esc(t('add'))}</button><button class="btn alt block" id="buy">⚡ ${esc(t('buy_now'))}</button></div></div>

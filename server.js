@@ -12,6 +12,7 @@ const app = express();
 const PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 app.set('trust proxy', 1);                       // Railway terminates TLS in front of us
 app.disable('x-powered-by');
+app.use('/api/admin/upload', express.json({ limit: '16mb' }));
 app.use(express.json({ limit: '6mb' }));
 app.use((req, res, next) => {
   res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'same-origin' });
@@ -20,7 +21,7 @@ app.use((req, res, next) => {
 });
 
 // ---------- tiny utils ----------
-const J = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
+const J = (s, d) => { try { const v = JSON.parse(s); return v === null || v === undefined ? d : v; } catch { return d; } };
 const err = (res, code, msg) => res.status(code).json({ error: msg });
 const wrap = (fn) => (req, res, next) => { try { const r = fn(req, res, next); if (r && r.catch) r.catch(next); } catch (e) { next(e); } };
 const hits = new Map();
@@ -424,25 +425,45 @@ A.get('/products', wrap((req, res) => {
   const q = req.query.q ? '%' + req.query.q + '%' : null;
   res.json(all(`SELECT * FROM products ${q ? 'WHERE name LIKE ? OR sku LIKE ?' : ''} ORDER BY id DESC LIMIT 500`, ...(q ? [q, q] : [])).map(productOut));
 }));
+const normName = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 function saveProduct(id, b) {
-  const name = b.name || {}, desc = b.desc || {};
+  const name = {}, desc = {};
+  for (const l of ['en', 'fr', 'de', 'es', 'zh']) { name[l] = String((b.name || {})[l] || '').trim().slice(0, 200); desc[l] = String((b.desc || {})[l] || '').trim().slice(0, 2000); }
   const price = Math.round(+b.price), kg = +b.kg;
   if (!(price >= 0) || !(kg >= 0) || !name.en && !name.fr) throw Object.assign(new Error('invalid'), { status: 400 });
+  // images: only our own files or http(s) links, no duplicates, max 12, order kept (first = main image)
+  const images = [...new Set((Array.isArray(b.images) ? b.images : []).map(String).filter(u => /^(\/img\/|https?:\/\/)/.test(u)))].slice(0, 12);
+  // never create the same product twice (same name in English or French); editing keeps working even on old duplicates
+  const old = id ? get('SELECT name FROM products WHERE id=?', id) : null; const oldN = old ? J(old.name, {}) : {};
+  const mine = ['en', 'fr'].map(l => normName(name[l])).filter(Boolean);
+  const renamed = !old || mine.some(x => x !== normName(oldN.en) && x !== normName(oldN.fr));
+  if (renamed) for (const r of all('SELECT id,sku,name,active FROM products WHERE id<>?', id || 0)) { const n = J(r.name, {}); if (mine.some(x => x === normName(n.en) || x === normName(n.fr))) throw Object.assign(new Error('duplicate:' + r.sku + ':' + r.active), { status: 409 }); }
   const f = [JSON.stringify(name), JSON.stringify(desc), b.cat || 'misc', b.section || 'g', price, kg, Math.max(0, Math.min(90, +b.discount || 0)), Math.max(1, +b.moq || 1),
-    JSON.stringify(b.images || []), JSON.stringify(b.variants || []), JSON.stringify(b.sizes || []), b.active === false ? 0 : 1, b.isNew ? 1 : 0, 0];
+    JSON.stringify(images), JSON.stringify((b.variants || []).map(v => String(v).slice(0, 80)).slice(0, 12)), JSON.stringify((b.sizes || []).map(v => String(v).slice(0, 30)).slice(0, 30)), b.active === false ? 0 : 1, b.isNew ? 1 : 0, 0];
   if (id) { run('UPDATE products SET name=?,descr=?,cat=?,section=?,price=?,kg=?,discount=?,moq=?,images=?,variants=?,sizes=?,active=?,is_new=?,needs_price=? WHERE id=?', ...f, id); return id; }
-  const r = run(`INSERT INTO products(name,descr,cat,section,price,kg,discount,moq,images,variants,sizes,active,is_new,needs_price,sku,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, ...f, 'TT-' + Date.now().toString(36).toUpperCase(), now());
+  const r = run(`INSERT INTO products(name,descr,cat,section,price,kg,discount,moq,images,variants,sizes,active,is_new,needs_price,sku,created_at,colors) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'{}')`, ...f, 'TT-' + Date.now().toString(36).toUpperCase(), now());
   return Number(r.lastInsertRowid);
 }
 A.post('/products', wrap((req, res) => { try { res.json({ id: saveProduct(0, req.body) }); } catch (e) { err(res, e.status || 500, e.message); } }));
 A.put('/products/:id', wrap((req, res) => { try { audit(req.user.id, 'product.update', req.params.id); res.json({ id: saveProduct(+req.params.id, req.body) }); } catch (e) { err(res, e.status || 500, e.message); } }));
-A.delete('/products/:id', wrap((req, res) => { run('UPDATE products SET active=0 WHERE id=?', +req.params.id); res.json({ ok: true }); }));
+A.delete('/products/:id', wrap((req, res) => {
+  const id = +req.params.id; const p = get('SELECT * FROM products WHERE id=?', id); if (!p) return err(res, 404, 'not_found');
+  if (req.query.hard === '1') {
+    if (p.active) return err(res, 400, 'hide_first');
+    if (get('SELECT 1 FROM order_items WHERE product_id=?', id)) return err(res, 409, 'has_orders');
+    run('DELETE FROM products WHERE id=?', id); audit(req.user.id, 'product.delete', p.sku); return res.json({ ok: true, deleted: true });
+  }
+  run('UPDATE products SET active=0 WHERE id=?', id); audit(req.user.id, 'product.hide', p.sku); res.json({ ok: true });
+}));
 A.post('/upload', wrap(async (req, res) => {
   const m = /^data:image\/(png|jpe?g|webp);base64,(.+)$/.exec(req.body?.data || ''); if (!m) return err(res, 400, 'bad_image');
-  const buf = Buffer.from(m[2], 'base64'); if (buf.length > 5e6) return err(res, 400, 'too_big');
-  const name = 'u' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex') + '.jpg';
-  const out = sharp ? await sharp(buf).rotate().resize(900, 900, { fit: 'inside', withoutEnlargement: false }).sharpen().jpeg({ quality: 84 }).toBuffer() : buf;
-  fs.writeFileSync(path.join(D.DATA_DIR, 'uploads', name), out); res.json({ url: '/img/u/' + name });
+  const buf = Buffer.from(m[2], 'base64'); if (buf.length > 12e6) return err(res, 400, 'too_big');
+  let out = buf, ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+  if (sharp) { try { out = await sharp(buf).rotate().resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 86 }).toBuffer(); ext = 'jpg'; } catch { return err(res, 400, 'bad_image'); } }
+  const name = 'u' + crypto.createHash('sha1').update(out).digest('hex').slice(0, 16) + '.' + ext;     // same picture = same file
+  const file = path.join(D.DATA_DIR, 'uploads', name); const dup = fs.existsSync(file);
+  if (!dup) fs.writeFileSync(file, out);
+  res.json({ url: '/img/u/' + name, dup });
 }));
 A.get('/countries', (req, res) => res.json(all('SELECT * FROM countries ORDER BY region, code')));
 A.put('/countries/:code', wrap((req, res) => {
